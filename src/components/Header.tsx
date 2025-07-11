@@ -116,7 +116,25 @@ export default function Header() {
   // Close search results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      // Check if click is outside any search container
+      const desktopSearchContainer = searchRef.current;
+      const mobileSearchContainers = document.querySelectorAll('.mobile-search-container');
+      
+      let isOutside = true;
+      
+      // Check desktop search container
+      if (desktopSearchContainer && desktopSearchContainer.contains(event.target as Node)) {
+        isOutside = false;
+      }
+      
+      // Check mobile search containers
+      mobileSearchContainers.forEach(container => {
+        if (container.contains(event.target as Node)) {
+          isOutside = false;
+        }
+      });
+      
+      if (isOutside) {
         setShowSearchResults(false);
       }
     };
@@ -353,8 +371,8 @@ export default function Header() {
               </svg>
             </button>
 
-            {/* Mobile Search - Same as desktop but smaller */}
-            <div className="flex-1 max-w-[80%] mx-4 relative" ref={searchRef}>
+            {/* Mobile Search - Same as desktop with dropdown */}
+            <div className="flex-1 max-w-[80%] mx-4 relative mobile-search-container">
               <form onSubmit={handleSearch} className="flex border border-gray-300 rounded-full overflow-hidden">
                 <div className="flex items-center px-3 bg-white text-gray-500">
                   <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -367,11 +385,87 @@ export default function Header() {
                   className="flex-1 px-3 py-4 text-lg text-black placeholder-[#626262] focus:outline-none"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => {
+                    if (search.trim() && searchResults.length > 0) {
+                      setShowSearchResults(true);
+                    }
+                  }}
                 />
                 <button type="submit" className="px-3 py-2 bg-[#FF0000] text-white hover:bg-red-700 transition-colors">
                   Search
                 </button>
               </form>
+
+              {/* Mobile Search Results Dropdown */}
+              {showSearchResults && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1 max-h-96 overflow-y-auto">
+                  {isSearching ? (
+                    <div className="p-4 text-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500 mx-auto"></div>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <>
+                      {searchResults.map((product) => (
+                        <div
+                          key={product.id}
+                          onClick={() => handleProductClick(product)}
+                          className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 flex items-center gap-3"
+                        >
+                          <div className="relative w-12 h-12 bg-gray-100 rounded flex-shrink-0">
+                            <Image
+                              src={product.imageURL}
+                              alt={product.itemName}
+                              fill
+                              className="object-cover rounded"
+                              sizes="48px"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-medium text-gray-900 truncate">
+                              {product.itemName}
+                            </h4>
+                            <p className="text-xs text-gray-500">
+                              {product.brand} • {product.category}
+                            </p>
+                            <p className="text-sm font-semibold text-red-600">
+                              {safeFormatPrice(product.amount)}
+                            </p>
+                          </div>
+                          {!product.inStock && (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+                              Out of Stock
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      {searchResults.length >= 8 && (
+                        <div className="p-3 text-center border-t border-gray-200">
+                          <button
+                            onClick={() => {
+                              router.push(`/shop?search=${encodeURIComponent(search.trim())}`);
+                              setShowSearchResults(false);
+                            }}
+                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                          >
+                            View all results for "{search}"
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : search.trim() && (
+                    <div className="p-4 text-center text-gray-500">
+                      <p>No products found for "{search}"</p>
+                      <Link 
+                        href="/shop"
+                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                        onClick={() => setShowSearchResults(false)}
+                      >
+                        Browse all products
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
