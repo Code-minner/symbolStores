@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --header_background: #F3F3F3;
+  --text_color: #1E1E1E;
+  --secondary_color: #FF0000;
+}
+
+
+body {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  color: var(--text_color);
+  font-family: 'Poppins', sans-serif;
+}
+
+@layer components {
+  .main-title {
+    @apply text-4xl font-bold;
+  }
+
+  .head_span {
+    @apply text-base hidden sm:block;
+    color: var(--text_color);
+  }
+
+  .category_chip {
+    @apply whitespace-nowrap font-medium cursor-pointer px-6 py-2 rounded-full text-white transition-colors duration-300;
+  }
+}
+
+.content_box {
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr; /* Mobile: 1 column */
+  gap: 40px;
+}
+
+@media (min-width: 768px) {
+  .content_box {
+    grid-template-columns: 1fr 1fr; /* Tablet: 2 columns */
+  }
+}
+
+@media (min-width: 1024px) {
+  .content_box {
+    grid-template-columns: 2fr 1fr 1fr 1fr; /* Desktop: 40% 20% 20% 20% */
+  }
+}
+
+/* Add this to your existing globals.css */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
