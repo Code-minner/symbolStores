@@ -57,7 +57,7 @@ export default function CartPage() {
 
           {/* Page Header */}
           <div className="flex items-center justify-between mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               Shopping Cart ({state.totalItems} items)
             </h1>
             {state.items.length > 0 && (
@@ -116,14 +116,14 @@ export default function CartPage() {
                           <div className="flex-1 min-w-0">
                             <Link 
                               href={getProductUrl(item)}
-                              className="text-lg font-medium text-gray-900 hover:text-red-600 transition-colors block"
+                              className="text-sm sm:text-lg font-medium text-gray-900 hover:text-red-600 transition-colors block"
                             >
                               {item.itemName}
                             </Link>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="hidden sm:block text-sm text-gray-500 mt-1">
                               {item.brand} • {item.category} • {item.subcategory}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="hidden sm:block text-xs text-gray-500 mt-1">
                               SKU: {item.sku}
                             </p>
                             {item.warranty && (
@@ -170,7 +170,7 @@ export default function CartPage() {
                               >
                                 <span className="text-sm">-</span>
                               </button>
-                              <span className="w-12 text-center font-medium">
+                              <span className="w-6 text-center font-medium">
                                 {item.quantity}
                               </span>
                               <button

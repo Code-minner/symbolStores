@@ -9,6 +9,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+        {
+        protocol: 'https',
+        hostname: 'symbolstores.com',
+        port: '',
+        pathname: '/assets/images/**',
+      },
       {
         protocol: 'https',
         hostname: 'api.placeholder.com',

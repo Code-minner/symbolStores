@@ -1,8 +1,13 @@
 // src/app/layout.tsx - Fixed SSR Issue
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import ClientCartProvider from '@/components/ClientCartProvider';
+import { CartProvider } from '@/lib/CartContext';
+import { WishlistProvider } from '@/lib/WishlistContext';
 import "../styles/globals.css";
+import 'swiper/css';
+import 'swiper/css/navigation';
+import { AuthProvider } from '@/contexts/AuthContext';
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,9 +40,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ClientCartProvider>
-          {children}
-        </ClientCartProvider>
+         <AuthProvider>
+          <WishlistProvider>
+        <CartProvider>          
+          {children}      
+        </CartProvider>
+        </WishlistProvider>
+        </AuthProvider>
       </body>
     </html>
   );

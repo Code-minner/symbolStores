@@ -4,6 +4,7 @@ import { useState, CSSProperties } from "react";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import { transform } from "next/dist/build/swc/generated-native";
+import Link from "next/link";
 
 
 export default function Footer() {
@@ -157,6 +158,7 @@ export default function Footer() {
               <h3 style={styles.subHeading}>Email</h3>
               <p style={styles.paragraph}>symbolglobal.serviceslimited@yahoo.com</p>
             </div>
+         
           </div>
 
           {/* Privacy and Terms */}
@@ -165,6 +167,12 @@ export default function Footer() {
             <h3 style={styles.minisubHeading}>Terms & Services</h3>
             <h3 style={styles.minisubHeading}>Privacy Policy</h3>
             <h3 style={styles.minisubHeading}>Cookie Policy</h3>
+<Link 
+                  href="/admin/login" 
+                  className="text-white hover:text-red-400 transition duration-200 flex items-center"
+                >
+                  Admin Login
+                </Link>
           </div>
 
           {/* Help */}

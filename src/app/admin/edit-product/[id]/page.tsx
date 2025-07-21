@@ -1,19 +1,18 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import { db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 
 type FormDataType = {
   itemName: string;
   category: string;
   subcategory: string;
   brand: string;
-  productName: string;
   description: string;
   features: string;
   tags: string;
@@ -22,61 +21,40 @@ type FormDataType = {
   status: string;
   sku: string;
   warranty: string;
-  imageURL: string;
 };
 
-export default function AdminAddProductPage() {
+export default function EditProductPage() {
   const { user, userData, loading: authLoading } = useAuth();
   const router = useRouter();
-
-  // Check admin access
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push('/admin/login');
-        return;
-      }
-      if (!userData?.isAdmin) {
-        router.push('/');
-        return;
-      }
-    }
-  }, [user, userData, authLoading, router]);
+  const params = useParams();
+  const productId = params.id as string;
 
   const [formData, setFormData] = useState<FormDataType>({
-    itemName: "",
-    category: "",
-    subcategory: "",
-    brand: "",
-    productName: "",
-    description: "",
-    features: "",
-    tags: "",
-    amount: "",
-    originalPrice: "",
-    status: "in stock",
-    sku: "",
-    warranty: "",
-    imageURL: "",
+    itemName: '',
+    category: '',
+    subcategory: '',
+    brand: '',
+    description: '',
+    features: '',
+    tags: '',
+    amount: '',
+    originalPrice: '',
+    status: 'in stock',
+    sku: '',
+    warranty: '',
   });
 
   const [images, setImages] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [currentUpload, setCurrentUpload] = useState("");
+  const [currentUpload, setCurrentUpload] = useState('');
 
-  // Categories and subcategories from your project
+  // Categories and subcategories (same as add product)
   const categories = [
-    "Home & Kitchen",
-    "Furniture",
-    "TV",
-    "Generator",
-    "Freezers",
-    "Microwave",
-    "Air Conditioner",
-    "Blender",
-    "Audio Bass",
-    "Others"
+    "Home & Kitchen", "Furniture", "TV", "Generator", "Freezers", 
+    "Microwave", "Air Conditioner", "Blender", "Audio Bass", "Others"
   ];
 
   const categorySubItems: { [key: string]: string[] } = {
@@ -96,11 +74,67 @@ export default function AdminAddProductPage() {
     "Samsung", "LG", "Sony", "Panasonic", "Hisense", "TCL", "Haier", 
     "Thermocool", "Scanfrost", "Nexus", "Bruhm", "Midea", "Kenstar",
     "Binatone", "Philips", "Bosch", "Whirlpool", "Electrolux", "Sharp",
-    "Toshiba", "Grundig", "Polystar", "Century", "Maxi", "Others", "ELEPAQ", 
+    "Toshiba", "Grundig", "Polystar", "Century", "Maxi", "Others", "ELEPAQ"
   ];
 
-  const generateSlug = (text: string) =>
-    text.toLowerCase().replace(/\s+/g, "-").replace(/[^\w\-]+/g, "");
+  // Check admin access and load product
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/admin/login');
+        return;
+      }
+      if (!userData?.isAdmin) {
+        router.push('/');
+        return;
+      }
+      loadProduct();
+    }
+  }, [user, userData, authLoading, router, productId]);
+
+  const loadProduct = async () => {
+    try {
+      const productDoc = await getDoc(doc(db, 'products', productId));
+      
+      if (!productDoc.exists()) {
+        alert('Product not found!');
+        router.push('/admin/dashboard');
+        return;
+      }
+
+      const productData = productDoc.data();
+      
+      // Populate form with existing data
+      setFormData({
+        itemName: productData.itemName || '',
+        category: productData.category || '',
+        subcategory: productData.subcategory || '',
+        brand: productData.brand || '',
+        description: productData.description || '',
+        features: Array.isArray(productData.features) ? productData.features.join('\n') : '',
+        tags: Array.isArray(productData.tags) ? productData.tags.join(', ') : '',
+        amount: productData.amount?.toString() || '',
+        originalPrice: productData.originalPrice?.toString() || '',
+        status: productData.status || 'in stock',
+        sku: productData.sku || '',
+        warranty: productData.warranty || '',
+      });
+
+      // Set existing images
+      if (productData.images && Array.isArray(productData.images)) {
+        setExistingImages(productData.images);
+      } else if (productData.imageURL) {
+        setExistingImages([productData.imageURL]);
+      }
+
+    } catch (error) {
+      console.error('Error loading product:', error);
+      alert('Error loading product data');
+      router.push('/admin/dashboard');
+    } finally {
+      setPageLoading(false);
+    }
+  };
 
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
@@ -143,32 +177,25 @@ export default function AdminAddProductPage() {
   };
 
   const uploadToCloudinary = async (image: File): Promise<string> => {
-    console.log(`Uploading ${image.name} to Cloudinary - Size: ${(image.size / 1024).toFixed(0)}KB`);
-    
     const formData = new FormData();
     formData.append('file', image);
     formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!);
     formData.append('cloud_name', process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!);
     
-    try {
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
       }
-      
-      const data = await response.json();
-      return data.secure_url;
-    } catch (error) {
-      console.error(`❌ Cloudinary upload failed for ${image.name}:`, error);
-      throw error;
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
     }
+    
+    const data = await response.json();
+    return data.secure_url;
   };
 
   const handleChange = (
@@ -177,13 +204,7 @@ export default function AdminAddProductPage() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "category" && value) {
-      const prefix = value.substring(0, 2).toUpperCase();
-      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const newSku = `${prefix}${random}`;
-      setFormData((prev) => ({ ...prev, sku: newSku }));
-    }
-
+    // Clear subcategory when category changes
     if (name === "category") {
       setFormData((prev) => ({ ...prev, subcategory: "" }));
     }
@@ -211,15 +232,8 @@ export default function AdminAddProductPage() {
       
       const compressedFiles = [];
       for (const file of selected) {
-        try {
-          const compressed = await compressImage(file);
-          compressedFiles.push(compressed);
-        } catch (error) {
-          console.error(`Failed to compress ${file.name}:`, error);
-          alert(`Failed to process ${file.name}. Please try a different image.`);
-          setCurrentUpload("");
-          return;
-        }
+        const compressed = await compressImage(file);
+        compressedFiles.push(compressed);
       }
       
       setImages(compressedFiles);
@@ -230,6 +244,14 @@ export default function AdminAddProductPage() {
       alert('Error processing images. Please try again.');
       setCurrentUpload("");
     }
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages(existingImages.filter((_, i) => i !== index));
+  };
+
+  const removeNewImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
   };
 
   const validateForm = () => {
@@ -263,7 +285,7 @@ export default function AdminAddProductPage() {
       return false;
     }
     
-    if (images.length === 0) {
+    if (existingImages.length === 0 && images.length === 0) {
       alert("At least one product image is required");
       return false;
     }
@@ -278,43 +300,43 @@ export default function AdminAddProductPage() {
     
     setLoading(true);
     setUploadProgress(0);
-    setCurrentUpload("Preparing upload...");
+    setCurrentUpload("Updating product...");
 
     try {
-      const slug = generateSlug(formData.itemName);
-      const itemId = `${slug}-${Date.now()}`;
-      const imageURLs: string[] = [];
+      let finalImageURLs = [...existingImages];
 
-      for (let i = 0; i < images.length; i++) {
-        const image = images[i];
+      // Upload new images if any
+      if (images.length > 0) {
+        setCurrentUpload("Uploading new images...");
         
-        try {
-          setCurrentUpload(`Uploading image ${i + 1} of ${images.length} to Cloudinary...`);
-          setUploadProgress((i / images.length) * 80);
+        for (let i = 0; i < images.length; i++) {
+          const image = images[i];
           
-          const downloadURL = await uploadToCloudinary(image);
-          imageURLs.push(downloadURL);
-          
-        } catch (uploadError: any) {
-          console.error(`❌ Cloudinary upload failed for image ${i + 1}:`, uploadError);
-          
-          const skipImage = confirm(
-            `Image ${i + 1} failed to upload to Cloudinary.\n\nError: ${uploadError.message}\n\nClick OK to skip this image and continue, or Cancel to stop.`
-          );
-          
-          if (!skipImage) {
-            throw new Error('Upload stopped by user');
+          try {
+            setCurrentUpload(`Uploading image ${i + 1} of ${images.length}...`);
+            setUploadProgress((i / images.length) * 80);
+            
+            const downloadURL = await uploadToCloudinary(image);
+            finalImageURLs.push(downloadURL);
+            
+          } catch (uploadError: any) {
+            console.error(`Upload failed for image ${i + 1}:`, uploadError);
+            
+            const skipImage = confirm(
+              `Image ${i + 1} failed to upload.\n\nClick OK to skip this image and continue, or Cancel to stop.`
+            );
+            
+            if (!skipImage) {
+              throw new Error('Upload stopped by user');
+            }
           }
         }
       }
 
-      if (imageURLs.length === 0) {
-        throw new Error('No images were uploaded to Cloudinary. Please check your internet connection and try again.');
-      }
-
       setUploadProgress(90);
-      setCurrentUpload("Saving product details to database...");
+      setCurrentUpload("Saving product updates...");
 
+      // Convert features and tags
       const featuresArray = formData.features
         .split('\n')
         .filter(feature => feature.trim() !== '')
@@ -325,7 +347,7 @@ export default function AdminAddProductPage() {
         .map(tag => tag.trim())
         .filter(tag => tag !== '');
 
-      const itemData = {
+      const updateData = {
         itemName: formData.itemName.trim(),
         category: formData.category,
         subcategory: formData.subcategory,
@@ -336,47 +358,22 @@ export default function AdminAddProductPage() {
         amount: parseFloat(formData.amount),
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
         status: formData.status,
-        sku: formData.sku,
         warranty: formData.warranty.trim() || null,
-        slug,
-        imageURL: imageURLs[0],
-        images: imageURLs,
+        imageURL: finalImageURLs[0], // Main image
+        images: finalImageURLs, // All images
         inStock: formData.status === "in stock",
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
-      await setDoc(doc(db, "products", itemId), itemData);
+      await updateDoc(doc(db, "products", productId), updateData);
       setUploadProgress(100);
-      setCurrentUpload("Product saved successfully!");
+      setCurrentUpload("Product updated successfully!");
 
-      alert("✅ Product added successfully!");
-      
-      // Reset form
-      setFormData({
-        itemName: "",
-        category: "",
-        subcategory: "",
-        brand: "",
-        productName: "",
-        description: "",
-        features: "",
-        tags: "",
-        amount: "",
-        originalPrice: "",
-        status: "in stock",
-        sku: "",
-        warranty: "",
-        imageURL: "",
-      });
-      setImages([]);
-      setUploadProgress(0);
-      setCurrentUpload("");
-      
+      alert("✅ Product updated successfully!");
       router.push("/admin/dashboard");
       
     } catch (err: any) {
-      console.error("Error adding product:", err);
+      console.error("Error updating product:", err);
       alert("❌ Error: " + (err.message || "Something went wrong. Please try again."));
     } finally {
       setLoading(false);
@@ -385,12 +382,7 @@ export default function AdminAddProductPage() {
     }
   };
 
-  const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
-
-  // Show loading spinner while checking auth
-  if (authLoading) {
+  if (authLoading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-500"></div>
@@ -412,7 +404,7 @@ export default function AdminAddProductPage() {
             >
               ← Back to Dashboard
             </button>
-            <h1 className="text-3xl font-bold text-red-500">Add New Product</h1>
+            <h1 className="text-3xl font-bold text-red-500">Edit Product</h1>
             <div></div>
           </div>
 
@@ -422,10 +414,41 @@ export default function AdminAddProductPage() {
               <h3 className="text-lg font-semibold mb-4 text-gray-800">
                 Product Images <span className="text-red-500">*</span>
               </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Upload high-quality images that showcase your product. At least one image is required.
-              </p>
               
+              {/* Existing Images */}
+              {existingImages.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">
+                    Current Images ({existingImages.length})
+                  </h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    {existingImages.map((imageUrl, idx) => (
+                      <div key={idx} className="relative border rounded-lg overflow-hidden group">
+                        <img
+                          src={imageUrl}
+                          alt={`Current ${idx + 1}`}
+                          className="object-cover w-full h-32"
+                        />
+                        {idx === 0 && (
+                          <span className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                            Main
+                          </span>
+                        )}
+                        <button
+                          onClick={() => removeExistingImage(idx)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          type="button"
+                          disabled={loading}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add New Images */}
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                 <input
                   type="file"
@@ -438,24 +461,12 @@ export default function AdminAddProductPage() {
                 />
                 <label htmlFor="fileInput" className={`cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center">
-                    <svg
-                      className="w-8 h-8 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </div>
-                  <p className="text-gray-600 mb-2 font-medium">Click to upload product images</p>
-                  <p className="text-sm text-gray-500">
-                    Maximum 3 images • Each under 5MB • Images will be compressed automatically
-                  </p>
+                  <p className="text-gray-600 mb-2 font-medium">Add more images</p>
+                  <p className="text-sm text-gray-500">Maximum 3 additional images</p>
                 </label>
               </div>
 
@@ -472,36 +483,28 @@ export default function AdminAddProductPage() {
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Please wait while we upload your images to Cloudinary. Do not close this page.
-                  </p>
                 </div>
               )}
 
-              {/* Image Previews */}
+              {/* New Image Previews */}
               {images.length > 0 && (
                 <div className="mt-6">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">
-                    Selected Images ({images.length}/3)
+                    New Images ({images.length})
                   </h4>
                   <div className="grid grid-cols-3 gap-4">
                     {images.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="relative border rounded-lg overflow-hidden group"
-                      >
+                      <div key={idx} className="relative border rounded-lg overflow-hidden group">
                         <img
                           src={URL.createObjectURL(img)}
-                          alt={`Preview ${idx + 1}`}
+                          alt={`New ${idx + 1}`}
                           className="object-cover w-full h-32"
                         />
-                        {idx === 0 && (
-                          <span className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-                            Main
-                          </span>
-                        )}
+                        <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
+                          New
+                        </span>
                         <button
-                          onClick={() => removeImage(idx)}
+                          onClick={() => removeNewImage(idx)}
                           className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                           type="button"
                           disabled={loading}
@@ -515,7 +518,7 @@ export default function AdminAddProductPage() {
               )}
             </div>
 
-            {/* Form Section */}
+            {/* Form Section - Same as add product but with pre-filled values */}
             <div className="bg-white rounded-lg p-6 shadow-lg">
               <h3 className="text-lg font-semibold mb-6 text-gray-800">Product Information</h3>
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -605,9 +608,8 @@ export default function AdminAddProductPage() {
                       type="text"
                       name="sku"
                       value={formData.sku}
-                      onChange={handleChange}
                       className="w-full p-3 border border-gray-300 rounded-lg text-black bg-gray-50"
-                      placeholder="Auto-generated"
+                      placeholder="Product SKU"
                       readOnly
                     />
                   </div>
@@ -620,7 +622,7 @@ export default function AdminAddProductPage() {
                   </label>
                   <textarea
                     name="description"
-                    placeholder="Provide a detailed description of the product, including specifications, benefits, and unique features..."
+                    placeholder="Provide a detailed description..."
                     rows={4}
                     onChange={handleChange}
                     value={formData.description}
@@ -628,9 +630,6 @@ export default function AdminAddProductPage() {
                     disabled={loading}
                     className="w-full p-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Minimum 10 characters required
-                  </p>
                 </div>
 
                 {/* Key Features */}
@@ -640,16 +639,13 @@ export default function AdminAddProductPage() {
                   </label>
                   <textarea
                     name="features"
-                    placeholder="HD Display&#10;Smart TV Features&#10;1 Year Warranty&#10;Energy Efficient"
+                    placeholder="List key features, one per line"
                     rows={4}
                     onChange={handleChange}
                     value={formData.features}
                     disabled={loading}
                     className="w-full p-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    List key features, one per line
-                  </p>
                 </div>
 
                 {/* Pricing */}
@@ -747,7 +743,7 @@ export default function AdminAddProductPage() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full bg-red-500 text-white py-4 rounded-lg font-semibold text-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="w-full bg-blue-500 text-white py-4 rounded-lg font-semibold text-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     disabled={loading}
                   >
                     {loading ? (
@@ -756,10 +752,10 @@ export default function AdminAddProductPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Saving Product...
+                        Updating Product...
                       </span>
                     ) : (
-                      "Save Product"
+                      "Update Product"
                     )}
                   </button>
                 </div>
