@@ -82,8 +82,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserData(null);
   };
 
+  // ✅ FIXED: Handle undefined user by converting to null
   const value = {
-    user,
+    user: user ?? null, // Convert undefined to null
     userData,
     loading: loading || dataLoading,
     signOut
