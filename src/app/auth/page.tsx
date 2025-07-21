@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -10,7 +10,8 @@ import { Icon } from '@iconify/react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
-export default function AuthPage() {
+// Separate component that uses useSearchParams
+function AuthContent() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -129,9 +130,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div>
-      <Header />
-      
+    <>
       {/* Fixed Breadcrumb */}
       <div className="w-[100%] overflow-x-auto bg-gray-100 py-3 px-4 mr-4">
         <nav className="w-full max-w-[1400] bg-gray-100 mx-auto flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
@@ -358,6 +357,75 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+// Loading fallback for auth page
+function AuthFallback() {
+  return (
+    <>
+      {/* Skeleton breadcrumb */}
+      <div className="w-[100%] overflow-x-auto bg-gray-100 py-3 px-4 mr-4">
+        <nav className="w-full max-w-[1400] bg-gray-100 mx-auto flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
+          <div className="animate-pulse flex space-x-2">
+            <div className="h-3 bg-gray-200 rounded w-12"></div>
+            <div className="h-3 bg-gray-200 rounded w-1"></div>
+            <div className="h-3 bg-gray-200 rounded w-16"></div>
+            <div className="h-3 bg-gray-200 rounded w-1"></div>
+            <div className="h-3 bg-gray-200 rounded w-14"></div>
+          </div>
+        </nav>
+      </div>
+
+      <div className="min-h-[60%] bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[500] w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="animate-pulse">
+              {/* Tab skeleton */}
+              <div className="flex border-b border-gray-200 mb-8">
+                <div className="flex-1 py-2 px-4">
+                  <div className="h-4 bg-gray-200 rounded w-16 mx-auto"></div>
+                </div>
+                <div className="flex-1 py-2 px-4">
+                  <div className="h-4 bg-gray-200 rounded w-16 mx-auto"></div>
+                </div>
+              </div>
+
+              {/* Form skeleton */}
+              <div className="space-y-4">
+                <div className="h-12 bg-gray-200 rounded"></div>
+                <div className="h-12 bg-gray-200 rounded"></div>
+                <div className="h-12 bg-gray-200 rounded"></div>
+                <div className="h-12 bg-gray-200 rounded"></div>
+              </div>
+
+              <div className="flex items-center my-6">
+                <div className="flex-1 border-t border-gray-300"></div>
+                <div className="px-4 h-4 bg-gray-200 rounded w-6"></div>
+                <div className="flex-1 border-t border-gray-300"></div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="h-12 bg-gray-200 rounded"></div>
+                <div className="h-12 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Main component with Suspense wrapper
+export default function AuthPage() {
+  return (
+    <div>
+      <Header />
+      <Suspense fallback={<AuthFallback />}>
+        <AuthContent />
+      </Suspense>
       <Footer />
     </div>
   );
