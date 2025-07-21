@@ -5,6 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+// ✅ FIXED: Import auth and signOut for logout functionality
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
@@ -94,10 +97,16 @@ export default function AdminDashboard() {
     router.push(`/admin/edit-product/${productId}`);
   };
 
+  // ✅ FIXED: Updated logout function with proper Firebase auth
   const handleLogout = async () => {
     if (confirm('Are you sure you want to logout?')) {
-      await auth.signOut();
-      router.push('/');
+      try {
+        await signOut(auth);
+        router.push('/');
+      } catch (error) {
+        console.error('Error signing out:', error);
+        alert('Failed to logout. Please try again.');
+      }
     }
   };
 
@@ -128,7 +137,7 @@ export default function AdminDashboard() {
     <div>
       <Header />
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-[1400] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
