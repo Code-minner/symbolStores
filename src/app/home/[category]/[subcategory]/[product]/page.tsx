@@ -12,12 +12,13 @@ import { useWishlist } from "@/lib/WishlistContext";
 import ProductSlider from "@/components/ProductSlider";
 import { useProducts } from "../../../../../lib/hooks/useProducts";
 
+// ✅ FIXED: Updated interface to handle Promise params
 interface ProductDetailsProps {
-  params: {
+  params: Promise<{
     category: string;
     subcategory: string;
     product: string;
-  };
+  }>;
 }
 
 interface Product {
@@ -82,11 +83,16 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
     )
     .slice(0, 6);
 
-  // Resolve params first
+  // ✅ FIXED: Properly handle Promise params
   useEffect(() => {
     const resolveParams = async () => {
-      const resolved = await params;
-      setResolvedParams(resolved);
+      try {
+        const resolved = await params;
+        setResolvedParams(resolved);
+      } catch (error) {
+        console.error("Error resolving params:", error);
+        setError("Failed to load product parameters");
+      }
     };
     resolveParams();
   }, [params]);
