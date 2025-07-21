@@ -125,13 +125,14 @@ export default function Home() {
           </div>
         </div>
 
-        {/* qualities about us */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 items-center justify-center gap-8 rounded-[30px] px-8 py-8 bg-gray-100">
-          <div className="grid grid-cols-1 sm:grid-cols-2 items-center justify-center px-8 py-4 h-[170px] sm:h-[140px] gap-4 rounded-[30px] bg-white">
+        {/* Qualities About Us */}
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 px-4 sm:px-8 py-8 rounded-[30px] bg-gray-100">
+          {/* Fast Shipping */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 px-2 py-4 sm:px-6 sm:py-6 h-auto sm:h-[140px] rounded-[30px] bg-white text-center sm:text-left">
             <Image
               src="/assets/vehicle_15630466 2.png"
-              alt="Symbol Store Logo"
-              width={80}
+              alt="Fast Shipping"
+              width={50}
               height={50}
               className="object-cover w-[50px] sm:w-[80px]"
               priority
@@ -141,15 +142,16 @@ export default function Home() {
                 Fast Shipping
               </h3>
               <p className="text-[10px] sm:text-[14px]">
-                Free shipping for all orders over N99000
+                Free shipping for all orders over N99,000
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 items-center justify-center gap-4 px-8 py-4 h-[170px] sm:h-[140px] rounded-[30px] bg-white">
+          {/* Return Policy */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 px-6 py-6 h-auto sm:h-[140px] rounded-[30px] bg-white text-center sm:text-left">
             <Image
               src="/assets/Vector.png"
-              alt="Symbol Store Logo"
+              alt="Return Policy"
               width={40}
               height={40}
               className="object-cover w-[30px] sm:w-[40px]"
@@ -165,10 +167,11 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 items-center justify-center gap-4 px-8 py-4 h-[170px] sm:h-[140px] rounded-[30px] bg-white">
+          {/* 24/7 Support */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 px-6 py-6 h-auto sm:h-[140px] rounded-[30px] bg-white text-center sm:text-left">
             <Image
               src="/assets/Vector (1).png"
-              alt="Symbol Store Logo"
+              alt="24/7 Support"
               width={40}
               height={40}
               className="object-cover w-[30px] sm:w-[40px]"
@@ -184,10 +187,11 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 items-center justify-center gap-4 px-8 py-4 h-[170px] sm:h-[140px] rounded-[30px] bg-white">
+          {/* Secure Payment */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 px-6 py-6 h-auto sm:h-[140px] rounded-[30px] bg-white text-center sm:text-left">
             <Image
               src="/assets/Vector (2).png"
-              alt="Symbol Store Logo"
+              alt="Secure Payment"
               width={50}
               height={40}
               className="object-cover w-[35px] sm:w-[50px]"
@@ -198,11 +202,12 @@ export default function Home() {
                 Secure Payment
               </h3>
               <p className="text-[10px] sm:text-[13px]">
-                We posess SSL / Secure Certificate
+                We possess SSL / Secure Certificate
               </p>
             </div>
           </div>
         </div>
+
         <main className="">
           <ProductGrid />
         </main>
@@ -232,40 +237,37 @@ export default function Home() {
                 className="border-2 border-transparent hover:border-blue-400 transition rounded-lg p-4 relative group"
               >
                 <Link
-                    key={productSub.id}
-                    href={productSub.href}
-                    className="flex flex-col items-center group w-full"
-                  >
-                {/* Image */}
-                <div className="relative w-full h-60 sm:h-80 mb-4">
-                  <Image
-                    src={productSub.image}
-                    alt={productSub.title}
-                    fill
-                    className="object-contain"
-                  />
+                  key={productSub.id}
+                  href={productSub.href}
+                  className="flex flex-col items-center group w-full"
+                >
+                  {/* Image */}
+                  <div className="relative w-full h-60 sm:h-80 mb-4">
+                    <Image
+                      src={productSub.image}
+                      alt={productSub.title}
+                      fill
+                      className="object-contain"
+                    />
 
-                  {/* Icons */}
-                  <div className="absolute right-2 bottom-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition">
-                    <button className="bg-white p-2 rounded-full shadow hover:bg-gray-100">
-                      💙
-                    </button>
-                    <button className="bg-white p-2 rounded-full shadow hover:bg-gray-100">
-                      🛒
-                    </button>
+                    {/* Icons */}
+                    <div className="absolute right-2 bottom-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition">
+                      <button className="bg-white p-2 rounded-full shadow hover:bg-gray-100">
+                        💙
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-cols-2 justify-between gap-8">
-                  {/* Title */}
-                  <p className="text-[12px] sm:text-[14px] text-gray-700 mb-1">
-                    {productSub.title}
-                  </p>
+                  <div className="flex flex-cols-2 justify-between gap-8">
+                    {/* Title */}
+                    <p className="text-[12px] sm:text-[14px] text-gray-700 mb-1">
+                      {productSub.title}
+                    </p>
 
-                  {/* Price */}
-                  <p className="text-[14px] sm:text-[16px] font-bold text-gray-900">
-                    {productSub.price}
-                  </p>
-                </div>
+                    {/* Price */}
+                    <p className="text-[14px] sm:text-[16px] font-bold text-gray-900">
+                      {productSub.price}
+                    </p>
+                  </div>
                 </Link>
               </div>
             ))}

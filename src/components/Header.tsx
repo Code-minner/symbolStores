@@ -77,6 +77,7 @@ export default function Header() {
   ];
 
   const categorySubItems: { [key: string]: string[] } = {
+    "All Categories": [],
     "Home & Kitchen": [
       "Toast",
       "Air Fryer",
@@ -582,7 +583,7 @@ export default function Header() {
                         {subItems.length > 0 && (
                           <svg
                             width="7"
-                            height="12"
+                            height="6"
                             viewBox="0 0 7 12"
                             fill="none"
                             xmlns="http://www.w3.org/2000/svg"

@@ -105,7 +105,7 @@ const HeroCarousel = () => {
                         </div>
 
                         {/* Bottom Bar with Button */}
-                        <div className="w-full  backdrop-blur-sm px-4 py-3 flex justify-end absolute bottom-[10px] left-0">
+                        <div className="w-full  px-4 py-3 flex justify-end absolute bottom-[10px] left-0">
                           <button 
                             className="bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-[4px] transition-colors duration-200 whitespace-nowrap"
                             onClick={() => {
