@@ -13,6 +13,30 @@ import ProductSlider from "@/components/ProductSlider";
 import { db } from "@/lib/firebase"; // Adjust path if needed
 import { collection, getDocs } from "firebase/firestore";
 
+
+
+// ✅ FIXED: Add missing Product interface
+interface Product {
+  id: string;
+  itemName: string;
+  category: string;
+  subcategory: string;
+  brand: string;
+  description: string;
+  features?: string[];
+  amount: number;
+  originalPrice?: number;
+  status: string;
+  sku: string;
+  warranty?: string;
+  imageURL: string;
+  images: string[];
+  inStock: boolean;
+  slug: string;
+  tags?: string[];
+  createdAt?: any;
+}
+
 export default function WishlistPage() {
   const { user, userData, loading: authLoading } = useAuth();
   const router = useRouter();
