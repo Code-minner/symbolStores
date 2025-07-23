@@ -1,4 +1,4 @@
-// src/app/review/page.tsx
+// src/app/review/page.tsx - Using the hook
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -7,17 +7,20 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useCart } from '@/lib/CartContext';
+import { useReviewData } from '@/lib/hooks/useReviewData';
 
 export default function ReviewPage() {
   const { state, formatPrice } = useCart();
   const router = useRouter();
   
-  // This would typically come from your checkout form state management
-  // For now, I'll use placeholder data that matches your image
-  const [reviewData, setReviewData] = useState({
+  // ✅ USE THE HOOK instead of local state
+  const { reviewData } = useReviewData();
+
+  // ✅ FALLBACK: If no data from hook, use placeholder
+  const displayData = reviewData || {
     address: {
       name: "John Doe",
-      fullAddress: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Turpis facilisis faucibus sed et ut. Turpis facilisis faucibus sed et ut."
+      fullAddress: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Turpis facilisis faucibus sed et ut. Turpis facilibus faucibus sed et ut."
     },
     payment: {
       type: "Credit / Debit Card",
@@ -25,7 +28,7 @@ export default function ReviewPage() {
       cardNumber: "0000 0000 0000 0000",
       expiryDate: "12 / 2027"
     }
-  });
+  };
 
   const breadcrumbs = [
     { name: "Home", href: "/" },
@@ -45,7 +48,7 @@ export default function ReviewPage() {
     // 3. Send confirmation emails
     // 4. Redirect to success page
     
-    console.log('Processing order...');
+    console.log('Processing order with data:', displayData);
     // router.push('/order-success');
   };
 
@@ -119,6 +122,13 @@ export default function ReviewPage() {
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Review</h1>
               <p className="text-gray-600">Please confirm if all informations are filled correctly</p>
+              
+              {/* ✅ DEBUG: Show data source */}
+              {process.env.NODE_ENV === 'development' && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Data source: {reviewData ? 'Hook' : 'Placeholder'}
+                </p>
+              )}
             </div>
 
             {/* Review Sections */}
@@ -133,10 +143,10 @@ export default function ReviewPage() {
                     </h2>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <h3 className="font-semibold text-gray-900 mb-2">
-                        {reviewData.address.name}
+                        {displayData.address.name}
                       </h3>
                       <p className="text-gray-600 text-sm leading-relaxed">
-                        {reviewData.address.fullAddress}
+                        {displayData.address.fullAddress}
                       </p>
                     </div>
                   </div>
@@ -158,12 +168,12 @@ export default function ReviewPage() {
                     </h2>
                     <div className="space-y-3">
                       <h3 className="font-semibold text-gray-900">
-                        {reviewData.payment.type}
+                        {displayData.payment.type}
                       </h3>
                       <div className="text-sm text-gray-600 space-y-1">
-                        <p className="font-medium">{reviewData.payment.name}</p>
-                        <p className="font-mono tracking-wider">{reviewData.payment.cardNumber}</p>
-                        <p>{reviewData.payment.expiryDate}</p>
+                        <p className="font-medium">{displayData.payment.name}</p>
+                        <p className="font-mono tracking-wider">{displayData.payment.cardNumber}</p>
+                        <p>{displayData.payment.expiryDate}</p>
                       </div>
                     </div>
                   </div>
@@ -233,28 +243,3 @@ export default function ReviewPage() {
     </div>
   );
 }
-
-// Optional: Create a hook to manage review data
-export const useReviewData = () => {
-  const [reviewData, setReviewData] = useState(null);
-
-  const setAddressData = (data: any) => {
-    setReviewData((prev: any) => ({
-      ...prev,
-      address: data
-    }));
-  };
-
-  const setPaymentData = (data: any) => {
-    setReviewData((prev: any) => ({
-      ...prev,
-      payment: data
-    }));
-  };
-
-  return {
-    reviewData,
-    setAddressData,
-    setPaymentData
-  };
-};
