@@ -1,15 +1,19 @@
+// ✅ FIXED: Admin Dashboard using ProductsCache instead of direct Firebase calls
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-// ✅ FIXED: Import auth and signOut for logout functionality
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+
+// ✅ FIXED: Import your ProductsCache instead of direct Firebase calls
+import { getAllProducts, clearProductsCache } from '@/lib/ProductsCache';
 
 interface Product {
   id: string;
@@ -51,15 +55,14 @@ export default function AdminDashboard() {
     }
   }, [user, userData, authLoading, router]);
 
+  // ✅ FIXED: Use ProductsCache instead of direct Firebase calls
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const productsCollection = collection(db, 'products');
-      const productsSnapshot = await getDocs(productsCollection);
-      const productsList = productsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Product[];
+      console.log('🔥 Admin Dashboard: Loading products via cache...');
+      
+      // Use your cache instead of direct Firebase call!
+      const productsList = await getAllProducts();
       
       // Sort by creation date (newest first)
       productsList.sort((a, b) => {
@@ -70,6 +73,7 @@ export default function AdminDashboard() {
       });
       
       setProducts(productsList);
+      console.log(`✅ Admin Dashboard: Loaded ${productsList.length} products via cache`);
     } catch (error) {
       console.error('Error loading products:', error);
       alert('Error loading products. Please refresh the page.');
@@ -78,14 +82,22 @@ export default function AdminDashboard() {
     }
   };
 
+  // ✅ FIXED: After deleting, refresh from cache instead of manual state update
   const handleDeleteProduct = async (productId: string, productName: string) => {
     if (!confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
       return;
     }
 
     try {
+      // Delete from Firebase
       await deleteDoc(doc(db, 'products', productId));
-      setProducts(products.filter(product => product.id !== productId));
+      
+      // Clear cache so next load gets fresh data
+      clearProductsCache();
+      
+      // Reload products from cache (will hit Firebase once to refresh)
+      await loadProducts();
+      
       alert('Product deleted successfully!');
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -97,7 +109,6 @@ export default function AdminDashboard() {
     router.push(`/admin/edit-product/${productId}`);
   };
 
-  // ✅ FIXED: Updated logout function with proper Firebase auth
   const handleLogout = async () => {
     if (confirm('Are you sure you want to logout?')) {
       try {
@@ -108,6 +119,12 @@ export default function AdminDashboard() {
         alert('Failed to logout. Please try again.');
       }
     }
+  };
+
+  // ✅ ADD: Refresh button to manually refresh cache
+  const handleRefreshProducts = async () => {
+    clearProductsCache();
+    await loadProducts();
   };
 
   // Filter products based on search and filters
@@ -146,6 +163,14 @@ export default function AdminDashboard() {
               <p className="text-gray-600 mt-1">Manage your products and inventory</p>
             </div>
             <div className="flex space-x-4 mt-4 md:mt-0">
+              {/* ✅ ADD: Refresh button */}
+              <button
+                onClick={handleRefreshProducts}
+                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition duration-200"
+                disabled={loading}
+              >
+                🔄 Refresh
+              </button>
               <button
                 onClick={() => router.push('/admin/add-product')}
                 className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition duration-200"

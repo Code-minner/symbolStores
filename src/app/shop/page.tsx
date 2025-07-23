@@ -1,34 +1,14 @@
+// src/app/shop/page.tsx - Using ProductsCache (No Quota Error!)
 "use client";
 
-// src/app/shop/page.tsx - Main Shop Page with Pagination and Brand Support
-
+import React from "react";
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { getAllProducts, Product } from "@/lib/ProductsCache"; // 🔥 Clean import!
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import Link from "next/link";
-
-interface Product {
-  id: string;
-  itemName: string;
-  category: string;
-  subcategory: string;
-  brand: string;
-  description: string;
-  amount: number;
-  originalPrice?: number;
-  status: string;
-  sku: string;
-  warranty?: string;
-  imageURL: string;
-  images: string[];
-  inStock: boolean;
-  slug: string;
-  createdAt: any;
-}
 
 interface Filters {
   selectedBrands: string[];
@@ -43,74 +23,78 @@ function ShopContent() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [availableSubcategories, setAvailableSubcategories] = useState<string[]>([]);
+  const [availableSubcategories, setAvailableSubcategories] = useState<
+    string[]
+  >([]);
   const [brandSearch, setBrandSearch] = useState("");
   const [showAllBrands, setShowAllBrands] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [productsPerPage] = useState(12); // Number of products per page
+  const [productsPerPage] = useState(12);
 
-  // Fixed brand list - show all these brands regardless of current inventory
-  const allBrands = [
-    "Samsung", "LG", "Sony", "Panasonic", "Hisense", "TCL", "Haier", 
-    "Thermocool", "Scanfrost", "Nexus", "Bruhm", "Midea", "Kenstar",
-    "Binatone", "Philips", "Bosch", "Whirlpool", "Electrolux", "Sharp",
-    "Toshiba", "Grundig", "Polystar", "Century", "Maxi", "Others", "ELEPAQ",
-    "Snowtec", "Gotv", "Bunatone"
-  ];
+  // Brands list 
+const allBrands = [
+  "Gotv", "Haier Thermocol", "Hisense", "Bruhm", "LG", "DAIKIN", "KENWOOD",
+  "Binatone", "Panasonic", "Scanfrost", "Sony", "SUMEC", "GREE", "Midea",
+  "MAXI", "Samsung", "Huawei", "Aeon", "Toshiba", "KENSTAR", "TCL", "Royal",
+  "Rite-Tek", "SYINIX", "INFINIX", "DELTA", "TRANE", "beko", "F&D",
+  "HOME FLOWER", "HARVELLS", "OX", "Century", "Nexus", "Nature Power",
+  "Navkar", "D-MARC", "Sonik", "Enkor", "Saisho", "Firman", "Power Deluxe",
+  "Itel Safer", "VBT-AX", "APC", "ZVT", "Sollatek", "TBK BIANCO", "Tigmax",
+  "ELEPAQ", "KEMAGE"
+];
 
-  // Get query parameters - ✅ ADDED BRAND PARAMETER
-  const categoryParam = searchParams.get('category');
-  const subcategoryParam = searchParams.get('subcategory');
-  const searchParam = searchParams.get('search');
-  const brandParam = searchParams.get('brand'); // ✅ NEW: Brand parameter
+
+  // Get query parameters
+  const categoryParam = searchParams.get("category");
+  const subcategoryParam = searchParams.get("subcategory");
+  const searchParam = searchParams.get("search");
+  const brandParam = searchParams.get("brand");
 
   const [filters, setFilters] = useState<Filters>({
     selectedBrands: [],
     selectedSubcategories: [],
-    selectedPriceRange: 'all',
+    selectedPriceRange: "all",
     inStockOnly: false,
-    discountOnly: false
+    discountOnly: false,
   });
 
   // Price ranges
   const priceRanges = [
-    { id: 'all', label: 'All Price', min: 0, max: Infinity },
-    { id: 'under-150k', label: 'Under 150k', min: 0, max: 150000 },
-    { id: '150k-200k', label: '150k to 200k', min: 150000, max: 200000 },
-    { id: '200k-500k', label: '200k to 500k', min: 200000, max: 500000 },
-    { id: '500k-800k', label: '500k to 800k', min: 500000, max: 800000 },
-    { id: '800k-1m', label: '800k to 1m', min: 800000, max: 1000000 },
-    { id: '1m-10m', label: '1m to 10m', min: 1000000, max: 10000000 },
+    { id: "all", label: "All Price", min: 0, max: Infinity },
+    { id: "under-150k", label: "Under 150k", min: 0, max: 150000 },
+    { id: "150k-200k", label: "150k to 200k", min: 150000, max: 200000 },
+    { id: "200k-500k", label: "200k to 500k", min: 200000, max: 500000 },
+    { id: "500k-800k", label: "500k to 800k", min: 500000, max: 800000 },
+    { id: "800k-1m", label: "800k to 1m", min: 800000, max: 1000000 },
+    { id: "1m-10m", label: "1m to 10m", min: 1000000, max: 10000000 },
   ];
 
-  // Fetch all products on mount
+  // 🔥 SUPER CLEAN: Load products using shared cache (NO QUOTA ERROR!)
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
         setError("");
 
-        const productsCollection = collection(db, "products");
-        const productsQuery = query(productsCollection, orderBy("createdAt", "desc"));
-        const productsSnapshot = await getDocs(productsQuery);
-
-        const productsData = productsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Product[];
-
+        // 🚀 ONE LINE! All caching handled automatically, no quota errors
+        const productsData = await getAllProducts();
         setAllProducts(productsData);
 
         // Extract unique subcategories from all products
-        const subcategories = [...new Set(productsData.map(p => p.subcategory))].filter(Boolean).sort();
+        const subcategories = [
+          ...new Set(productsData.map((p) => p.subcategory)),
+        ]
+          .filter(Boolean)
+          .sort();
         setAvailableSubcategories(subcategories);
-
       } catch (err) {
         console.error("Error fetching products:", err);
-        setError("Failed to load products. Please check your internet connection and try again.");
+        setError(
+          "Failed to load products. Please check your internet connection and try again."
+        );
       } finally {
         setLoading(false);
       }
@@ -119,12 +103,12 @@ function ShopContent() {
     fetchProducts();
   }, []);
 
-  // ✅ NEW: Auto-select brand from URL parameter
+  // Auto-select brand from URL parameter
   useEffect(() => {
     if (brandParam && allBrands.includes(brandParam)) {
-      setFilters(prev => ({
+      setFilters((prev) => ({
         ...prev,
-        selectedBrands: [brandParam]
+        selectedBrands: [brandParam],
       }));
     }
   }, [brandParam]);
@@ -134,112 +118,124 @@ function ShopContent() {
     setCurrentPage(1);
   }, [filters, categoryParam, subcategoryParam, searchParam, brandParam]);
 
-  // Filtered brands based on search - using fixed brand list
+  // Filtered brands based on search
   const filteredBrands = useMemo(() => {
     if (!brandSearch.trim()) {
       return allBrands;
     }
-    return allBrands.filter(brand => 
+    return allBrands.filter((brand) =>
       brand.toLowerCase().includes(brandSearch.toLowerCase())
     );
   }, [allBrands, brandSearch]);
 
-  // Apply all filters including URL parameters
+  // Apply all filters including URL parameters - YOUR EXACT LOGIC
   const filteredProducts = useMemo(() => {
     let filtered = [...allProducts];
 
     // URL Parameter Filters (from header navigation)
-
-    // Category filter from URL
     if (categoryParam) {
-      filtered = filtered.filter(product => {
-        const productCategory = product.category?.toLowerCase() || '';
+      filtered = filtered.filter((product) => {
+        const productCategory = product.category?.toLowerCase() || "";
         const searchCategory = categoryParam.toLowerCase();
-        return productCategory === searchCategory ||
+        return (
+          productCategory === searchCategory ||
           productCategory.includes(searchCategory) ||
-          searchCategory.includes(productCategory);
+          searchCategory.includes(productCategory)
+        );
       });
     }
 
-    // Subcategory filter from URL
     if (subcategoryParam) {
-      filtered = filtered.filter(product => {
-        const productSubcategory = product.subcategory?.toLowerCase() || '';
+      filtered = filtered.filter((product) => {
+        const productSubcategory = product.subcategory?.toLowerCase() || "";
         const searchSubcategory = subcategoryParam.toLowerCase();
-        return productSubcategory === searchSubcategory ||
+        return (
+          productSubcategory === searchSubcategory ||
           productSubcategory.includes(searchSubcategory) ||
-          searchSubcategory.includes(productSubcategory);
+          searchSubcategory.includes(productSubcategory)
+        );
       });
     }
 
     // Search filter from URL
     if (searchParam) {
       const searchTerm = searchParam.toLowerCase().trim();
-      filtered = filtered.filter(product => {
+      filtered = filtered.filter((product) => {
         const searchableFields = [
           product.itemName,
           product.brand,
           product.category,
           product.subcategory,
-          product.description
-        ].join(' ').toLowerCase();
+          product.description || "", // Handle empty descriptions
+        ]
+          .join(" ")
+          .toLowerCase();
 
         return searchableFields.includes(searchTerm);
       });
     }
 
     // Sidebar Filters (user-selected filters)
-
-    // Brand filter
     if (filters.selectedBrands.length > 0) {
-      filtered = filtered.filter(product =>
+      filtered = filtered.filter((product) =>
         filters.selectedBrands.includes(product.brand)
       );
     }
 
-    // Subcategory filter (from sidebar)
     if (filters.selectedSubcategories.length > 0) {
-      filtered = filtered.filter(product =>
+      filtered = filtered.filter((product) =>
         filters.selectedSubcategories.includes(product.subcategory)
       );
     }
 
     // Price range filter
-    if (filters.selectedPriceRange !== 'all') {
-      const selectedRange = priceRanges.find(range => range.id === filters.selectedPriceRange);
+    if (filters.selectedPriceRange !== "all") {
+      const selectedRange = priceRanges.find(
+        (range) => range.id === filters.selectedPriceRange
+      );
       if (selectedRange) {
-        filtered = filtered.filter(product =>
-          product.amount >= selectedRange.min && product.amount <= selectedRange.max
+        filtered = filtered.filter(
+          (product) =>
+            product.amount >= selectedRange.min &&
+            product.amount <= selectedRange.max
         );
       }
     }
 
     // In stock filter
     if (filters.inStockOnly) {
-      filtered = filtered.filter(product => product.inStock);
+      filtered = filtered.filter((product) => product.inStock);
     }
 
     // Discount filter
     if (filters.discountOnly) {
-      filtered = filtered.filter(product =>
-        product.originalPrice && product.originalPrice > product.amount
+      filtered = filtered.filter(
+        (product) =>
+          product.originalPrice && product.originalPrice > product.amount
       );
     }
 
     return filtered;
-  }, [allProducts, categoryParam, subcategoryParam, searchParam, filters, priceRanges]);
+  }, [
+    allProducts,
+    categoryParam,
+    subcategoryParam,
+    searchParam,
+    filters,
+    priceRanges,
+  ]);
 
-  // Pagination calculations
+  // Pagination calculations - YOUR EXACT LOGIC
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
   const startIndex = (currentPage - 1) * productsPerPage;
   const endIndex = startIndex + productsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Pagination helper functions
+  // Pagination helper functions - YOUR EXACT LOGIC
   const goToPage = (page: number) => {
     setCurrentPage(page);
     // Scroll to top of products section
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const getPageNumbers = () => {
@@ -281,93 +277,100 @@ function ShopContent() {
 
     // Apply URL filters first
     if (categoryParam) {
-      baseProducts = baseProducts.filter(product => {
-        const productCategory = product.category?.toLowerCase() || '';
+      baseProducts = baseProducts.filter((product) => {
+        const productCategory = product.category?.toLowerCase() || "";
         const searchCategory = categoryParam.toLowerCase();
-        return productCategory === searchCategory ||
+        return (
+          productCategory === searchCategory ||
           productCategory.includes(searchCategory) ||
-          searchCategory.includes(productCategory);
+          searchCategory.includes(productCategory)
+        );
       });
     }
 
     if (searchParam) {
       const searchTerm = searchParam.toLowerCase().trim();
-      baseProducts = baseProducts.filter(product => {
+      baseProducts = baseProducts.filter((product) => {
         const searchableFields = [
           product.itemName,
           product.brand,
           product.category,
           product.subcategory,
-          product.description
-        ].join(' ').toLowerCase();
+          product.description || "",
+        ]
+          .join(" ")
+          .toLowerCase();
         return searchableFields.includes(searchTerm);
       });
     }
 
-    return [...new Set(baseProducts.map(p => p.subcategory))].filter(Boolean).sort();
+    return [...new Set(baseProducts.map((p) => p.subcategory))]
+      .filter(Boolean)
+      .sort();
   }, [allProducts, categoryParam, searchParam]);
 
   const handleBrandChange = (brand: string, checked: boolean) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
       selectedBrands: checked
         ? [...prev.selectedBrands, brand]
-        : prev.selectedBrands.filter(b => b !== brand)
+        : prev.selectedBrands.filter((b) => b !== brand),
     }));
   };
 
   const handleSubcategoryChange = (subcategory: string, checked: boolean) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
       selectedSubcategories: checked
         ? [...prev.selectedSubcategories, subcategory]
-        : prev.selectedSubcategories.filter(s => s !== subcategory)
+        : prev.selectedSubcategories.filter((s) => s !== subcategory),
     }));
   };
 
   const handlePriceRangeChange = (rangeId: string) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
-      selectedPriceRange: rangeId
+      selectedPriceRange: rangeId,
     }));
   };
 
-  // ✅ UPDATED: Clear filters function to handle URL brand parameter
   const clearFilters = () => {
     setFilters({
       selectedBrands: brandParam ? [brandParam] : [], // Keep URL brand if present
       selectedSubcategories: [],
-      selectedPriceRange: 'all',
+      selectedPriceRange: "all",
       inStockOnly: false,
-      discountOnly: false
+      discountOnly: false,
     });
     setBrandSearch("");
     setShowAllBrands(false);
     setCurrentPage(1);
   };
 
-  // ✅ UPDATED: Dynamic breadcrumbs based on URL parameters including brand
+  // Dynamic breadcrumbs based on URL parameters including brand
   const breadcrumbs = useMemo(() => {
     const crumbs = [
       { name: "Home", href: "/" },
-      { name: "Shop", href: "/shop" }
+      { name: "Shop", href: "/shop" },
     ];
 
     // Add brand breadcrumb
     if (brandParam) {
       crumbs.push({
         name: `${brandParam} Products`,
-        href: `/shop?brand=${encodeURIComponent(brandParam)}`
+        href: `/shop?brand=${encodeURIComponent(brandParam)}`,
       });
     }
 
     if (categoryParam) {
-      const categoryUrl = brandParam 
-        ? `/shop?brand=${encodeURIComponent(brandParam)}&category=${encodeURIComponent(categoryParam)}`
+      const categoryUrl = brandParam
+        ? `/shop?brand=${encodeURIComponent(
+            brandParam
+          )}&category=${encodeURIComponent(categoryParam)}`
         : `/shop?category=${encodeURIComponent(categoryParam)}`;
       crumbs.push({
         name: categoryParam,
-        href: categoryUrl
+        href: categoryUrl,
       });
     }
 
@@ -375,20 +378,21 @@ function ShopContent() {
       let subcategoryUrl = `/shop?`;
       const params = [];
       if (brandParam) params.push(`brand=${encodeURIComponent(brandParam)}`);
-      if (categoryParam) params.push(`category=${encodeURIComponent(categoryParam)}`);
+      if (categoryParam)
+        params.push(`category=${encodeURIComponent(categoryParam)}`);
       params.push(`subcategory=${encodeURIComponent(subcategoryParam)}`);
-      subcategoryUrl += params.join('&');
-      
+      subcategoryUrl += params.join("&");
+
       crumbs.push({
         name: subcategoryParam,
-        href: subcategoryUrl
+        href: subcategoryUrl,
       });
     }
 
     return crumbs;
   }, [categoryParam, subcategoryParam, brandParam]);
 
-  // ✅ UPDATED: Page title to include brand
+  // Page title to include brand
   const pageTitle = useMemo(() => {
     if (brandParam && searchParam) {
       return `${brandParam} - Search results for "${searchParam}"`;
@@ -414,7 +418,7 @@ function ShopContent() {
     return "All Products";
   }, [categoryParam, subcategoryParam, searchParam, brandParam]);
 
-  // ✅ UPDATED: Page subtitle to include brand context
+  // Page subtitle to include brand context
   const pageSubtitle = useMemo(() => {
     if (brandParam && searchParam && categoryParam) {
       return `${brandParam} products in ${categoryParam}`;
@@ -448,6 +452,9 @@ function ShopContent() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500 mx-auto mb-4"></div>
             <p className="text-gray-600 text-lg">Loading products...</p>
+            <p className="text-gray-500 text-sm mt-2">
+              Using cached data for faster loading
+            </p>
           </div>
         </div>
         <Footer />
@@ -462,7 +469,9 @@ function ShopContent() {
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center max-w-md mx-auto px-4">
             <div className="text-red-500 text-6xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Oops! Something went wrong</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Oops! Something went wrong
+            </h2>
             <p className="text-gray-600 mb-6">{error}</p>
             <div className="space-y-4">
               <button
@@ -490,10 +499,9 @@ function ShopContent() {
       <Header />
       <div className="min-h-screen bg-gray-50">
         <div className="w-full max-w-[1400px] mx-auto px-2 sm:px-4 py-6">
-
           {/* Mobile Filter Backdrop */}
           {showMobileFilters && (
-            <div 
+            <div
               className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
               onClick={() => setShowMobileFilters(false)}
             />
@@ -504,14 +512,29 @@ function ShopContent() {
             <div className="lg:hidden fixed top-0 left-0 h-full w-[85%] max-w-[320px] bg-white shadow-xl z-50 transform transition-transform duration-300">
               <div className="flex flex-col h-full">
                 {/* Mobile Filter Header */}
-                <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: "var(--header_background)" }}>
-                  <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+                <div
+                  className="flex items-center justify-between p-4 border-b"
+                  style={{ backgroundColor: "var(--header_background)" }}
+                >
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Filters
+                  </h3>
                   <button
                     onClick={() => setShowMobileFilters(false)}
                     className="p-2 hover:bg-gray-200 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -520,7 +543,7 @@ function ShopContent() {
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                   {/* Clear All Filters Button */}
                   <div>
-                    <button 
+                    <button
                       onClick={clearFilters}
                       className="text-sm text-orange-600 hover:text-orange-700 font-medium min-h-[44px] px-2 py-2"
                     >
@@ -530,7 +553,9 @@ function ShopContent() {
 
                   {/* Brands Filter */}
                   <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Brands</h4>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                      Brands
+                    </h4>
                     {/* Brand Search Bar */}
                     <div className="relative mb-4">
                       <input
@@ -541,37 +566,62 @@ function ShopContent() {
                         className="w-full px-3 py-3 pl-10 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500 min-h-[44px]"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M7.28394 0.351624C8.56605 0.1711 9.87355 0.300392 11.0955 0.728577C12.3172 1.15675 13.4185 1.8714 14.3074 2.81256C15.1963 3.75384 15.8472 4.89443 16.2048 6.13873C16.5625 7.3831 16.6165 8.69522 16.363 9.9649C16.1096 11.2345 15.5558 12.425 14.7478 13.4366L18.0574 16.7462C18.2214 16.916 18.3123 17.1439 18.3103 17.3799C18.3083 17.616 18.2135 17.8419 18.0466 18.0089C17.8797 18.1758 17.6538 18.2704 17.4177 18.2725C17.1816 18.2746 16.9538 18.1836 16.7839 18.0196L13.4744 14.71C12.2819 15.6628 10.8445 16.2597 9.32788 16.4317C7.81131 16.6036 6.27658 16.3442 4.90112 15.6827C3.52562 15.021 2.36483 13.9837 1.55249 12.6915C0.740138 11.3991 0.309194 9.90348 0.309326 8.37701C0.309484 7.08234 0.619179 5.80645 1.21362 4.65631C1.80812 3.50611 2.67015 2.51463 3.72632 1.76569C4.78226 1.01702 6.00218 0.53217 7.28394 0.351624ZM8.41479 2.07233C7.58689 2.07233 6.76659 2.23597 6.00171 2.5528C5.23701 2.86958 4.5421 3.33375 3.95679 3.91901C3.37137 4.50442 2.90642 5.20003 2.5896 5.96491C2.27291 6.72962 2.11012 7.54932 2.11011 8.37701C2.11011 9.20491 2.27277 10.0252 2.5896 10.7901C2.90642 11.5549 3.37142 12.2497 3.95679 12.835C4.5421 13.4203 5.23699 13.8844 6.00171 14.2012C6.76659 14.5181 7.58689 14.6817 8.41479 14.6817C10.0867 14.6816 11.6906 14.0173 12.8728 12.835C14.055 11.6527 14.7185 10.0489 14.7185 8.37701C14.7185 6.70507 14.055 5.10127 12.8728 3.91901C11.6906 2.73678 10.0867 2.0724 8.41479 2.07233ZM8.41479 3.87408C9.60882 3.87414 10.754 4.34827 11.5984 5.19244C12.4429 6.03692 12.9177 7.18275 12.9177 8.37701C12.9177 9.57131 12.4429 10.7171 11.5984 11.5616C10.754 12.4058 9.60886 12.8799 8.41479 12.8799C7.22052 12.8799 6.07472 12.406 5.23022 11.5616C4.38572 10.7171 3.91187 9.57131 3.91187 8.37701C3.91189 7.18275 4.38574 6.03692 5.23022 5.19244C6.07471 4.34804 7.22056 3.87408 8.41479 3.87408Z" fill="#626262" />
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 19 19"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M7.28394 0.351624C8.56605 0.1711 9.87355 0.300392 11.0955 0.728577C12.3172 1.15675 13.4185 1.8714 14.3074 2.81256C15.1963 3.75384 15.8472 4.89443 16.2048 6.13873C16.5625 7.3831 16.6165 8.69522 16.363 9.9649C16.1096 11.2345 15.5558 12.425 14.7478 13.4366L18.0574 16.7462C18.2214 16.916 18.3123 17.1439 18.3103 17.3799C18.3083 17.616 18.2135 17.8419 18.0466 18.0089C17.8797 18.1758 17.6538 18.2704 17.4177 18.2725C17.1816 18.2746 16.9538 18.1836 16.7839 18.0196L13.4744 14.71C12.2819 15.6628 10.8445 16.2597 9.32788 16.4317C7.81131 16.6036 6.27658 16.3442 4.90112 15.6827C3.52562 15.021 2.36483 13.9837 1.55249 12.6915C0.740138 11.3991 0.309194 9.90348 0.309326 8.37701C0.309484 7.08234 0.619179 5.80645 1.21362 4.65631C1.80812 3.50611 2.67015 2.51463 3.72632 1.76569C4.78226 1.01702 6.00218 0.53217 7.28394 0.351624ZM8.41479 2.07233C7.58689 2.07233 6.76659 2.23597 6.00171 2.5528C5.23701 2.86958 4.5421 3.33375 3.95679 3.91901C3.37137 4.50442 2.90642 5.20003 2.5896 5.96491C2.27291 6.72962 2.11012 7.54932 2.11011 8.37701C2.11011 9.20491 2.27277 10.0252 2.5896 10.7901C2.90642 11.5549 3.37142 12.2497 3.95679 12.835C4.5421 13.4203 5.23699 13.8844 6.00171 14.2012C6.76659 14.5181 7.58689 14.6817 8.41479 14.6817C10.0867 14.6816 11.6906 14.0173 12.8728 12.835C14.055 11.6527 14.7185 10.0489 14.7185 8.37701C14.7185 6.70507 14.055 5.10127 12.8728 3.91901C11.6906 2.73678 10.0867 2.0724 8.41479 2.07233ZM8.41479 3.87408C9.60882 3.87414 10.754 4.34827 11.5984 5.19244C12.4429 6.03692 12.9177 7.18275 12.9177 8.37701C12.9177 9.57131 12.4429 10.7171 11.5984 11.5616C10.754 12.4058 9.60886 12.8799 8.41479 12.8799C7.22052 12.8799 6.07472 12.406 5.23022 11.5616C4.38572 10.7171 3.91187 9.57131 3.91187 8.37701C3.91189 7.18275 4.38574 6.03692 5.23022 5.19244C6.07471 4.34804 7.22056 3.87408 8.41479 3.87408Z"
+                            fill="#626262"
+                          />
                         </svg>
                       </div>
                     </div>
 
                     {/* Brand List */}
-                    <div className="space-y-4 max-h-48 overflow-y-auto">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
                       {filteredBrands
                         .slice(0, showAllBrands ? filteredBrands.length : 10)
-                        .map(brand => (
-                          <label key={brand} className="flex items-center cursor-pointer group min-h-[44px] py-2">
+                        .map((brand) => (
+                          <label
+                            key={brand}
+                            className="flex items-center cursor-pointer group min-h-[36px] py-1"
+                          >
                             <div className="relative mr-3">
                               <input
                                 type="checkbox"
                                 checked={filters.selectedBrands.includes(brand)}
-                                onChange={(e) => handleBrandChange(brand, e.target.checked)}
+                                onChange={(e) =>
+                                  handleBrandChange(brand, e.target.checked)
+                                }
                                 className="sr-only"
                               />
-                              <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${filters.selectedBrands.includes(brand)
-                                  ? 'bg-orange-500 border-orange-500'
-                                  : 'border-gray-300 group-hover:border-orange-400'
-                                }`}>
+                              <div
+                                className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                                  filters.selectedBrands.includes(brand)
+                                    ? "bg-orange-500 border-orange-500"
+                                    : "border-gray-300 group-hover:border-orange-400"
+                                }`}
+                              >
                                 {filters.selectedBrands.includes(brand) && (
-                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  <svg
+                                    className="w-3 h-3 text-white"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
                                   </svg>
                                 )}
                               </div>
                             </div>
-                            <span className="text-lg text-gray-700 group-hover:text-gray-900 leading-relaxed">
+                            <span className="text-sm text-gray-700 group-hover:text-gray-900 leading-relaxed">
                               {brand}
                             </span>
                           </label>
@@ -584,51 +634,86 @@ function ShopContent() {
                         onClick={() => setShowAllBrands(!showAllBrands)}
                         className="text-sm text-orange-600 hover:text-orange-700 mt-4 font-medium min-h-[44px] px-2 py-2"
                       >
-                        {showAllBrands ? '← View less' : `View more (${filteredBrands.length - 10} more)`}
+                        {showAllBrands
+                          ? "← View less"
+                          : `View more (${filteredBrands.length - 10} more)`}
                       </button>
                     )}
                   </div>
 
                   {/* Subcategories Filter */}
-                  {!subcategoryParam && currentAvailableSubcategories.length > 1 && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Subcategories</h4>
-                      <div className="space-y-4 max-h-48 overflow-y-auto">
-                        {currentAvailableSubcategories.map(subcategory => (
-                          <label key={subcategory} className="flex items-center cursor-pointer group min-h-[44px] py-2">
-                            <div className="relative mr-3">
-                              <input
-                                type="checkbox"
-                                checked={filters.selectedSubcategories.includes(subcategory)}
-                                onChange={(e) => handleSubcategoryChange(subcategory, e.target.checked)}
-                                className="sr-only"
-                              />
-                              <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${filters.selectedSubcategories.includes(subcategory) 
-                                  ? 'bg-orange-500 border-orange-500' 
-                                  : 'border-gray-300 group-hover:border-orange-400'
-                                }`}>
-                                {filters.selectedSubcategories.includes(subcategory) && (
-                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
+                  {!subcategoryParam &&
+                    currentAvailableSubcategories.length > 1 && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                          Subcategories
+                        </h4>
+                        <div className="space-y-4 max-h-48 overflow-y-auto">
+                          {currentAvailableSubcategories.map((subcategory) => (
+                            <label
+                              key={subcategory}
+                              className="flex items-center cursor-pointer group min-h-[44px] py-2"
+                            >
+                              <div className="relative mr-3">
+                                <input
+                                  type="checkbox"
+                                  checked={filters.selectedSubcategories.includes(
+                                    subcategory
+                                  )}
+                                  onChange={(e) =>
+                                    handleSubcategoryChange(
+                                      subcategory,
+                                      e.target.checked
+                                    )
+                                  }
+                                  className="sr-only"
+                                />
+                                <div
+                                  className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                                    filters.selectedSubcategories.includes(
+                                      subcategory
+                                    )
+                                      ? "bg-orange-500 border-orange-500"
+                                      : "border-gray-300 group-hover:border-orange-400"
+                                  }`}
+                                >
+                                  {filters.selectedSubcategories.includes(
+                                    subcategory
+                                  ) && (
+                                    <svg
+                                      className="w-3 h-3 text-white"
+                                      fill="currentColor"
+                                      viewBox="0 0 20 20"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <span className="text-lg text-gray-700 group-hover:text-gray-900 leading-relaxed">
-                              {subcategory}
-                            </span>
-                          </label>
-                        ))}
+                              <span className="text-lg text-gray-700 group-hover:text-gray-900 leading-relaxed">
+                                {subcategory}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Price Range Filter */}
                   <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Price Range</h4>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                      Price Range
+                    </h4>
                     <div className="space-y-4">
                       {priceRanges.map((range) => (
-                        <label key={range.id} className="flex items-center cursor-pointer group min-h-[44px] py-2">
+                        <label
+                          key={range.id}
+                          className="flex items-center cursor-pointer group min-h-[44px] py-2"
+                        >
                           <div className="relative mr-3">
                             <input
                               type="radio"
@@ -638,10 +723,13 @@ function ShopContent() {
                               onChange={() => handlePriceRangeChange(range.id)}
                               className="sr-only"
                             />
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${filters.selectedPriceRange === range.id
-                                ? 'border-orange-500 bg-white'
-                                : 'border-gray-300 group-hover:border-orange-400'
-                              }`}>
+                            <div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                filters.selectedPriceRange === range.id
+                                  ? "border-orange-500 bg-white"
+                                  : "border-gray-300 group-hover:border-orange-400"
+                              }`}
+                            >
                               {filters.selectedPriceRange === range.id && (
                                 <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
                               )}
@@ -662,16 +750,32 @@ function ShopContent() {
                         <input
                           type="checkbox"
                           checked={filters.inStockOnly}
-                          onChange={(e) => setFilters(prev => ({ ...prev, inStockOnly: e.target.checked }))}
+                          onChange={(e) =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              inStockOnly: e.target.checked,
+                            }))
+                          }
                           className="sr-only"
                         />
-                        <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${filters.inStockOnly
-                            ? 'bg-orange-500 border-orange-500'
-                            : 'border-gray-300 group-hover:border-orange-400'
-                          }`}>
+                        <div
+                          className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                            filters.inStockOnly
+                              ? "bg-orange-500 border-orange-500"
+                              : "border-gray-300 group-hover:border-orange-400"
+                          }`}
+                        >
                           {filters.inStockOnly && (
-                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            <svg
+                              className="w-3 h-3 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
                             </svg>
                           )}
                         </div>
@@ -684,22 +788,40 @@ function ShopContent() {
 
                   {/* Discount Filter */}
                   <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Discount</h4>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                      Discount
+                    </h4>
                     <label className="flex items-center cursor-pointer group min-h-[44px] py-2">
                       <div className="relative mr-3">
                         <input
                           type="checkbox"
                           checked={filters.discountOnly}
-                          onChange={(e) => setFilters(prev => ({ ...prev, discountOnly: e.target.checked }))}
+                          onChange={(e) =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              discountOnly: e.target.checked,
+                            }))
+                          }
                           className="sr-only"
                         />
-                        <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${filters.discountOnly
-                            ? 'bg-orange-500 border-orange-500'
-                            : 'border-gray-300 group-hover:border-orange-400'
-                          }`}>
+                        <div
+                          className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                            filters.discountOnly
+                              ? "bg-orange-500 border-orange-500"
+                              : "border-gray-300 group-hover:border-orange-400"
+                          }`}
+                        >
                           {filters.discountOnly && (
-                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            <svg
+                              className="w-3 h-3 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
                             </svg>
                           )}
                         </div>
@@ -727,30 +849,79 @@ function ShopContent() {
           {/* Breadcrumbs */}
           <div className="mb-6">
             <div className="flex items-center justify-between gap-4">
-              <nav className="flex items-center gap-2 text-sm text-gray-600 overflow-x-auto min-w-0">
-                {breadcrumbs.map((item, index) => (
-                  <div key={index} className="flex items-center whitespace-nowrap gap-2">
-                    {index > 0 && <span className="text-gray-400 px-1">›</span>}
-                    <Link
-                      href={item.href}
-                      className={`hover:text-blue-600 px-1 py-2 min-h-[32px] flex items-center ${index === breadcrumbs.length - 1
-                        ? 'text-blue-600 font-medium'
-                        : 'text-gray-600'
+              <div className="w-[95%] overflow-x-auto py-3 pr-4 mr-4">
+                <nav className="flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
+                  {breadcrumbs.map((item, index) => (
+                    <React.Fragment key={index}>
+                      {index > 0 && (
+                        <span className="text-gray-400 flex items-center">
+                          <svg
+                            width="6"
+                            height="10"
+                            viewBox="0 0 6 10"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M1.5 1.25L5.25 5L1.5 8.75"
+                              stroke="#77878F"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </span>
+                      )}
+                      <a
+                        href={item.href}
+                        className={`flex items-center gap-1 text-[12px] hover:text-blue-600 transition-colors ${
+                          index === breadcrumbs.length - 1
+                            ? "text-blue-600 font-medium"
+                            : "text-gray-600"
                         }`}
-                    >
-                      {item.name}
-                    </Link>
-                  </div>
-                ))}
-              </nav>
-              
+                      >
+                        {index === 0 && (
+                          <svg
+                            className="mb-[1px]"
+                            width="12"
+                            height="14"
+                            viewBox="0 0 16 17"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M9.875 15.2498V11.4998C9.875 11.334 9.80915 11.1751 9.69194 11.0579C9.57473 10.9406 9.41576 10.8748 9.25 10.8748H6.75C6.58424 10.8748 6.42527 10.9406 6.30806 11.0579C6.19085 11.1751 6.125 11.334 6.125 11.4998V15.2498C6.125 15.4156 6.05915 15.5745 5.94194 15.6917C5.82473 15.809 5.66576 15.8748 5.5 15.8748H1.75C1.58424 15.8748 1.42527 15.809 1.30806 15.6917C1.19085 15.5745 1.125 15.4156 1.125 15.2498V8.02324C1.1264 7.93674 1.14509 7.8514 1.17998 7.77224C1.21486 7.69308 1.26523 7.6217 1.32812 7.5623L7.57812 1.88261C7.69334 1.77721 7.84384 1.71875 8 1.71875C8.15616 1.71875 8.30666 1.77721 8.42187 1.88261L14.6719 7.5623C14.7348 7.6217 14.7851 7.69308 14.82 7.77224C14.8549 7.8514 14.8736 7.93674 14.875 8.02324V15.2498C14.875 15.4156 14.8092 15.5745 14.6919 15.6917C14.5747 15.809 14.4158 15.8748 14.25 15.8748H10.5C10.3342 15.8748 10.1753 15.809 10.0581 15.6917C9.94085 15.5745 9.875 15.4156 9.875 15.2498Z"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                        {item.name}
+                      </a>
+                    </React.Fragment>
+                  ))}
+                </nav>
+              </div>
+
               {/* Mobile Filter Toggle Button */}
               <button
                 onClick={() => setShowMobileFilters(!showMobileFilters)}
                 className="lg:hidden flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors min-h-[44px] flex-shrink-0"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                  />
                 </svg>
                 <span className="text-sm font-medium">Filters</span>
               </button>
@@ -760,16 +931,20 @@ function ShopContent() {
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Desktop Filter Sidebar */}
             <div className="hidden lg:block w-full lg:w-[24rem] lg:flex-shrink-0">
-              <div className="rounded-lg shadow-sm border p-4 lg:p-6 lg:sticky lg:top-6" style={{ backgroundColor: "var(--header_background)" }}>
-
+              <div
+                className="rounded-lg shadow-sm border p-4 lg:p-6 lg:sticky lg:top-6"
+                style={{ backgroundColor: "var(--header_background)" }}
+              >
                 {/* Filter Header */}
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900">Brands</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Brands
+                  </h3>
                 </div>
 
                 {/* Clear All Filters Button */}
                 <div className="mb-4">
-                  <button 
+                  <button
                     onClick={clearFilters}
                     className="text-sm text-orange-600 hover:text-orange-700 font-medium min-h-[36px] px-2 py-2"
                   >
@@ -789,8 +964,17 @@ function ShopContent() {
                       className="w-full px-3 py-3 pl-10 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500 min-h-[44px]"
                     />
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7.28394 0.351624C8.56605 0.1711 9.87355 0.300392 11.0955 0.728577C12.3172 1.15675 13.4185 1.8714 14.3074 2.81256C15.1963 3.75384 15.8472 4.89443 16.2048 6.13873C16.5625 7.3831 16.6165 8.69522 16.363 9.9649C16.1096 11.2345 15.5558 12.425 14.7478 13.4366L18.0574 16.7462C18.2214 16.916 18.3123 17.1439 18.3103 17.3799C18.3083 17.616 18.2135 17.8419 18.0466 18.0089C17.8797 18.1758 17.6538 18.2704 17.4177 18.2725C17.1816 18.2746 16.9538 18.1836 16.7839 18.0196L13.4744 14.71C12.2819 15.6628 10.8445 16.2597 9.32788 16.4317C7.81131 16.6036 6.27658 16.3442 4.90112 15.6827C3.52562 15.021 2.36483 13.9837 1.55249 12.6915C0.740138 11.3991 0.309194 9.90348 0.309326 8.37701C0.309484 7.08234 0.619179 5.80645 1.21362 4.65631C1.80812 3.50611 2.67015 2.51463 3.72632 1.76569C4.78226 1.01702 6.00218 0.53217 7.28394 0.351624ZM8.41479 2.07233C7.58689 2.07233 6.76659 2.23597 6.00171 2.5528C5.23701 2.86958 4.5421 3.33375 3.95679 3.91901C3.37137 4.50442 2.90642 5.20003 2.5896 5.96491C2.27291 6.72962 2.11012 7.54932 2.11011 8.37701C2.11011 9.20491 2.27277 10.0252 2.5896 10.7901C2.90642 11.5549 3.37142 12.2497 3.95679 12.835C4.5421 13.4203 5.23699 13.8844 6.00171 14.2012C6.76659 14.5181 7.58689 14.6817 8.41479 14.6817C10.0867 14.6816 11.6906 14.0173 12.8728 12.835C14.055 11.6527 14.7185 10.0489 14.7185 8.37701C14.7185 6.70507 14.055 5.10127 12.8728 3.91901C11.6906 2.73678 10.0867 2.0724 8.41479 2.07233ZM8.41479 3.87408C9.60882 3.87414 10.754 4.34827 11.5984 5.19244C12.4429 6.03692 12.9177 7.18275 12.9177 8.37701C12.9177 9.57131 12.4429 10.7171 11.5984 11.5616C10.754 12.4058 9.60886 12.8799 8.41479 12.8799C7.22052 12.8799 6.07472 12.406 5.23022 11.5616C4.38572 10.7171 3.91187 9.57131 3.91187 8.37701C3.91189 7.18275 4.38574 6.03692 5.23022 5.19244C6.07471 4.34804 7.22056 3.87408 8.41479 3.87408Z" fill="#626262" />
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 19 19"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M7.28394 0.351624C8.56605 0.1711 9.87355 0.300392 11.0955 0.728577C12.3172 1.15675 13.4185 1.8714 14.3074 2.81256C15.1963 3.75384 15.8472 4.89443 16.2048 6.13873C16.5625 7.3831 16.6165 8.69522 16.363 9.9649C16.1096 11.2345 15.5558 12.425 14.7478 13.4366L18.0574 16.7462C18.2214 16.916 18.3123 17.1439 18.3103 17.3799C18.3083 17.616 18.2135 17.8419 18.0466 18.0089C17.8797 18.1758 17.6538 18.2704 17.4177 18.2725C17.1816 18.2746 16.9538 18.1836 16.7839 18.0196L13.4744 14.71C12.2819 15.6628 10.8445 16.2597 9.32788 16.4317C7.81131 16.6036 6.27658 16.3442 4.90112 15.6827C3.52562 15.021 2.36483 13.9837 1.55249 12.6915C0.740138 11.3991 0.309194 9.90348 0.309326 8.37701C0.309484 7.08234 0.619179 5.80645 1.21362 4.65631C1.80812 3.50611 2.67015 2.51463 3.72632 1.76569C4.78226 1.01702 6.00218 0.53217 7.28394 0.351624ZM8.41479 2.07233C7.58689 2.07233 6.76659 2.23597 6.00171 2.5528C5.23701 2.86958 4.5421 3.33375 3.95679 3.91901C3.37137 4.50442 2.90642 5.20003 2.5896 5.96491C2.27291 6.72962 2.11012 7.54932 2.11011 8.37701C2.11011 9.20491 2.27277 10.0252 2.5896 10.7901C2.90642 11.5549 3.37142 12.2497 3.95679 12.835C4.5421 13.4203 5.23699 13.8844 6.00171 14.2012C6.76659 14.5181 7.58689 14.6817 8.41479 14.6817C10.0867 14.6816 11.6906 14.0173 12.8728 12.835C14.055 11.6527 14.7185 10.0489 14.7185 8.37701C14.7185 6.70507 14.055 5.10127 12.8728 3.91901C11.6906 2.73678 10.0867 2.0724 8.41479 2.07233ZM8.41479 3.87408C9.60882 3.87414 10.754 4.34827 11.5984 5.19244C12.4429 6.03692 12.9177 7.18275 12.9177 8.37701C12.9177 9.57131 12.4429 10.7171 11.5984 11.5616C10.754 12.4058 9.60886 12.8799 8.41479 12.8799C7.22052 12.8799 6.07472 12.406 5.23022 11.5616C4.38572 10.7171 3.91187 9.57131 3.91187 8.37701C3.91189 7.18275 4.38574 6.03692 5.23022 5.19244C6.07471 4.34804 7.22056 3.87408 8.41479 3.87408Z"
+                          fill="#626262"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -799,22 +983,38 @@ function ShopContent() {
                   <div className="space-y-4 overflow-y-auto">
                     {filteredBrands
                       .slice(0, showAllBrands ? filteredBrands.length : 10)
-                      .map(brand => (
-                        <label key={brand} className="flex items-center cursor-pointer group min-h-[36px] py-1">
+                      .map((brand) => (
+                        <label
+                          key={brand}
+                          className="flex items-center cursor-pointer group mb-2 py-1"
+                        >
                           <div className="relative mr-3">
                             <input
                               type="checkbox"
                               checked={filters.selectedBrands.includes(brand)}
-                              onChange={(e) => handleBrandChange(brand, e.target.checked)}
+                              onChange={(e) =>
+                                handleBrandChange(brand, e.target.checked)
+                              }
                               className="sr-only"
                             />
-                            <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${filters.selectedBrands.includes(brand)
-                                ? 'bg-orange-500 border-orange-500'
-                                : 'border-gray-300 group-hover:border-orange-400'
-                              }`}>
+                            <div
+                              className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                                filters.selectedBrands.includes(brand)
+                                  ? "bg-orange-500 border-orange-500"
+                                  : "border-gray-300 group-hover:border-orange-400"
+                              }`}
+                            >
                               {filters.selectedBrands.includes(brand) && (
-                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                <svg
+                                  className="w-3 h-3 text-white"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                  />
                                 </svg>
                               )}
                             </div>
@@ -832,17 +1032,24 @@ function ShopContent() {
                       onClick={() => setShowAllBrands(!showAllBrands)}
                       className="text-sm text-orange-600 hover:text-orange-700 mt-4 font-medium min-h-[36px] px-2 py-2"
                     >
-                      {showAllBrands ? '← View less' : `View more (${filteredBrands.length - 10} more)`}
+                      {showAllBrands
+                        ? "← View less"
+                        : `View more (${filteredBrands.length - 10} more)`}
                     </button>
                   )}
                 </div>
 
                 {/* Price Range Filter */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-900 mb-4">Price Range</h4>
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-4">
+                    Price Range
+                  </h4>
                   <div className="space-y-4">
                     {priceRanges.map((range) => (
-                      <label key={range.id} className="flex items-center cursor-pointer group min-h-[36px] py-1">
+                      <label
+                        key={range.id}
+                        className="flex items-center cursor-pointer group mb-2 py-1"
+                      >
                         <div className="relative mr-3">
                           <input
                             type="radio"
@@ -852,10 +1059,13 @@ function ShopContent() {
                             onChange={() => handlePriceRangeChange(range.id)}
                             className="sr-only"
                           />
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${filters.selectedPriceRange === range.id
-                              ? 'border-orange-500 bg-white'
-                              : 'border-gray-300 group-hover:border-orange-400'
-                            }`}>
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              filters.selectedPriceRange === range.id
+                                ? "border-orange-500 bg-white"
+                                : "border-gray-300 group-hover:border-orange-400"
+                            }`}
+                          >
                             {filters.selectedPriceRange === range.id && (
                               <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
                             )}
@@ -876,16 +1086,32 @@ function ShopContent() {
                       <input
                         type="checkbox"
                         checked={filters.inStockOnly}
-                        onChange={(e) => setFilters(prev => ({ ...prev, inStockOnly: e.target.checked }))}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            inStockOnly: e.target.checked,
+                          }))
+                        }
                         className="sr-only"
                       />
-                      <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${filters.inStockOnly
-                          ? 'bg-orange-500 border-orange-500'
-                          : 'border-gray-300 group-hover:border-orange-400'
-                        }`}>
+                      <div
+                        className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                          filters.inStockOnly
+                            ? "bg-orange-500 border-orange-500"
+                            : "border-gray-300 group-hover:border-orange-400"
+                        }`}
+                      >
                         {filters.inStockOnly && (
-                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          <svg
+                            className="w-3 h-3 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
                           </svg>
                         )}
                       </div>
@@ -898,22 +1124,40 @@ function ShopContent() {
 
                 {/* Discount Filter */}
                 <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-900 mb-4">Discount</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-4">
+                    Discount
+                  </h4>
                   <label className="flex items-center cursor-pointer group min-h-[36px] py-1">
                     <div className="relative mr-3">
                       <input
                         type="checkbox"
                         checked={filters.discountOnly}
-                        onChange={(e) => setFilters(prev => ({ ...prev, discountOnly: e.target.checked }))}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            discountOnly: e.target.checked,
+                          }))
+                        }
                         className="sr-only"
                       />
-                      <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${filters.discountOnly
-                          ? 'bg-orange-500 border-orange-500'
-                          : 'border-gray-300 group-hover:border-orange-400'
-                        }`}>
+                      <div
+                        className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                          filters.discountOnly
+                            ? "bg-orange-500 border-orange-500"
+                            : "border-gray-300 group-hover:border-orange-400"
+                        }`}
+                      >
                         {filters.discountOnly && (
-                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          <svg
+                            className="w-3 h-3 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
                           </svg>
                         )}
                       </div>
@@ -928,62 +1172,85 @@ function ShopContent() {
 
             {/* Right Content - Products */}
             <div className="flex-1 min-w-0">
-
               {/* Page Header */}
               <div className="mb-6">
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{pageTitle}</h1>
+                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+                  {pageTitle}
+                </h1>
                 {pageSubtitle && (
                   <p className="text-gray-600 mb-2">{pageSubtitle}</p>
                 )}
-                
+
                 {/* Results count */}
                 <p className="text-sm text-gray-500">
-                  Showing {startIndex + 1}-{Math.min(endIndex, filteredProducts.length)} of {filteredProducts.length} products
+                  Showing {startIndex + 1}-
+                  {Math.min(endIndex, filteredProducts.length)} of{" "}
+                  {filteredProducts.length} products
                   {currentPage > 1 && ` (Page ${currentPage} of ${totalPages})`}
                 </p>
               </div>
 
               {/* Subcategory Quick Links - Only show if in category view */}
-              {categoryParam && !subcategoryParam && currentAvailableSubcategories.length > 1 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">Browse by Subcategory</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {currentAvailableSubcategories.map((subcategory) => (
-                      <Link
-                        key={subcategory}
-                        href={`/shop?category=${encodeURIComponent(categoryParam)}&subcategory=${encodeURIComponent(subcategory)}`}
-                        className="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm hover:border-orange-300 hover:text-orange-600 transition-colors min-h-[36px] flex items-center"
-                      >
-                        {subcategory}
-                      </Link>
-                    ))}
+              {categoryParam &&
+                !subcategoryParam &&
+                currentAvailableSubcategories.length > 1 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">
+                      Browse by Subcategory
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {currentAvailableSubcategories.map((subcategory) => (
+                        <Link
+                          key={subcategory}
+                          href={`/shop?category=${encodeURIComponent(
+                            categoryParam
+                          )}&subcategory=${encodeURIComponent(subcategory)}`}
+                          className="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm hover:border-orange-300 hover:text-orange-600 transition-colors min-h-[36px] flex items-center"
+                        >
+                          {subcategory}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Products Grid */}
               {currentProducts.length === 0 ? (
                 <div className="text-center py-16 px-4">
                   <div className="mb-4">
-                    <svg className="w-16 h-16 lg:w-24 lg:h-24 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8V4a1 1 0 00-1-1H6a1 1 0 00-1 1v1h16z" />
+                    <svg
+                      className="w-16 h-16 lg:w-24 lg:h-24 mx-auto text-gray-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8V4a1 1 0 00-1-1H6a1 1 0 00-1 1v1h16z"
+                      />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No products found</h3>
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">
+                    No products found
+                  </h3>
                   <p className="text-gray-500 mb-6 max-w-md mx-auto">
                     {brandParam && searchParam
                       ? `No ${brandParam} products found for "${searchParam}"`
                       : brandParam
-                        ? `No ${brandParam} products found`
-                        : searchParam
-                          ? `No products found for "${searchParam}"`
-                          : categoryParam || subcategoryParam
-                            ? `No products found in this category`
-                            : "Try adjusting your filters to see more products"
-                    }
+                      ? `No ${brandParam} products found`
+                      : searchParam
+                      ? `No products found for "${searchParam}"`
+                      : categoryParam || subcategoryParam
+                      ? `No products found in this category`
+                      : "Try adjusting your filters to see more products"}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    {(filters.selectedBrands.length > 0 || filters.selectedSubcategories.length > 0 || filters.inStockOnly || filters.discountOnly) && (
+                    {(filters.selectedBrands.length > 0 ||
+                      filters.selectedSubcategories.length > 0 ||
+                      filters.inStockOnly ||
+                      filters.discountOnly) && (
                       <button
                         onClick={clearFilters}
                         className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors min-h-[48px]"
@@ -1005,10 +1272,7 @@ function ShopContent() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 mb-8">
                     {currentProducts.map((product, index) => (
                       <div key={product.id} className="flex justify-center">
-                        <ProductCard
-                          product={product}
-                          isTopRated={index < 3}
-                        />
+                        <ProductCard product={product} isTopRated={index < 3} />
                       </div>
                     ))}
                   </div>
@@ -1077,7 +1341,9 @@ function ShopContent() {
 
                       {/* Next Button */}
                       <button
-                        onClick={() => goToPage(Math.min(currentPage + 1, totalPages))}
+                        onClick={() =>
+                          goToPage(Math.min(currentPage + 1, totalPages))
+                        }
                         disabled={currentPage === totalPages}
                         className={`px-2 sm:px-4 py-2 rounded-full border transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center ${
                           currentPage === totalPages
@@ -1123,18 +1389,20 @@ function ShopContent() {
 
 export default function ShopPage() {
   return (
-    <Suspense fallback={
-      <div>
-        <Header />
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500 mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading...</p>
+    <Suspense
+      fallback={
+        <div>
+          <Header />
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500 mx-auto mb-4"></div>
+              <p className="text-gray-600 text-lg">Loading...</p>
+            </div>
           </div>
+          <Footer />
         </div>
-        <Footer />
-      </div>
-    }>
+      }
+    >
       <ShopContent />
     </Suspense>
   );

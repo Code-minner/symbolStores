@@ -1,94 +1,23 @@
-// src/app/search/page.tsx
+// src/app/search/page.tsx - Using Shared ProductsCache (Super Clean!)
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { searchProducts, Product } from "@/lib/ProductsCache"; // 🔥 Clean import!
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Link from "next/link";
 import Image from "next/image";
 
-interface Product {
-  id: string;
-  itemName: string;
-  category: string;
-  subcategory: string;
-  brand: string;
-  description: string;
-  amount: number;
-  originalPrice?: number;
-  status: string;
-  sku: string;
-  warranty?: string;
-  imageURL: string;
-  images: string[];
-  inStock: boolean;
-  slug: string;
-  tags: string[];
-}
-
-// Separate component for search logic
 function SearchContent() {
   const searchParams = useSearchParams();
-  const searchQuery = searchParams.get('q') || '';
+  const searchQuery = searchParams.get('q') || searchParams.get('search') || '';
   
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch all products
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const productsCollection = collection(db, "products");
-        const productsQuery = query(productsCollection, orderBy("createdAt", "desc"));
-        const productsSnapshot = await getDocs(productsQuery);
-        
-        const productsData = productsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Product[];
-
-        setProducts(productsData);
-      } catch (err) {
-        console.error("Error fetching products:", err);
-        setError("Failed to load products. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
-
-  // Filter products based on search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProducts([]);
-      return;
-    }
-
-    const searchTerm = searchQuery.toLowerCase().trim();
-    const filtered = products.filter(product => {
-      const searchableFields = [
-        product.itemName,
-        product.brand,
-        product.category,
-        product.subcategory,
-        product.description,
-        ...(product.tags || [])
-      ].join(' ').toLowerCase();
-
-      return searchableFields.includes(searchTerm);
-    });
-
-    setFilteredProducts(filtered);
-  }, [searchQuery, products]);
-
+  // Price formatting function
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -97,8 +26,35 @@ function SearchContent() {
     }).format(price);
   };
 
+  // 🔥 SUPER CLEAN: Search using shared cache
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+
+        // 🚀 ONE LINE! All caching handled automatically
+        const results = await searchProducts(searchQuery);
+        setSearchResults(results);
+
+      } catch (err) {
+        console.error("Error searching products:", err);
+        setError("Failed to search products. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    performSearch();
+  }, [searchQuery]);
+
   const getProductUrl = (product: Product) => {
-    // Using your /home/[category]/[subcategory]/[product] structure
     return `/home/${product.category.toLowerCase().replace(/\s+/g, '-')}/${product.subcategory.toLowerCase().replace(/\s+/g, '-')}/${product.slug}`;
   };
 
@@ -119,10 +75,11 @@ function SearchContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Searching products...</p>
+          <p className="text-gray-600 text-xl">Searching products...</p>
+          <p className="text-gray-500 text-sm mt-2">Using cached data for lightning-fast search</p>
         </div>
       </div>
     );
@@ -130,15 +87,25 @@ function SearchContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 text-xl mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600"
-          >
-            Try Again
-          </button>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Search Error</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="space-y-4">
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Try Again
+            </button>
+            <Link
+              href="/shop"
+              className="block bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Browse All Products
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -159,7 +126,7 @@ function SearchContent() {
                 Results for: <span className="font-semibold text-black">"{searchQuery}"</span>
               </p>
               <p className="text-gray-500">
-                {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
+                {searchResults.length} product{searchResults.length !== 1 ? 's' : ''} found
               </p>
             </div>
           )}
@@ -174,9 +141,15 @@ function SearchContent() {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-600 mb-2">Enter a search term</h3>
-            <p className="text-gray-500">Use the search bar above to find products</p>
+            <p className="text-gray-500 mb-6">Use the search bar above to find products</p>
+            <Link 
+              href="/shop" 
+              className="inline-block bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Browse All Products
+            </Link>
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : searchResults.length === 0 ? (
           <div className="text-center py-16">
             <div className="mb-4">
               <svg className="w-24 h-24 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,15 +158,21 @@ function SearchContent() {
             </div>
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No products found</h3>
             <p className="text-gray-500 mb-4">
-              Try different keywords or browse our categories
+              No results found for "<strong>{searchQuery}</strong>". Try different keywords or browse our categories.
             </p>
             <div className="space-x-4">
               <Link 
                 href="/shop" 
-                className="inline-block bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600 transition-colors"
+                className="inline-block bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors"
               >
                 View All Products
               </Link>
+              <button
+                onClick={() => window.history.back()}
+                className="inline-block bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Go Back
+              </button>
             </div>
           </div>
         ) : (
@@ -202,10 +181,10 @@ function SearchContent() {
             <div className="mb-6">
               <p className="text-sm text-gray-600 mb-2">Popular searches:</p>
               <div className="flex flex-wrap gap-2">
-                {['Samsung', 'TV', 'Generator', 'Freezer', 'Air Conditioner'].map((term) => (
+                {['Samsung', 'TV', 'Generator', 'Freezer', 'Air Conditioner', 'LG', 'Sony'].map((term) => (
                   <Link
                     key={term}
-                    href={`/search?q=${term}`}
+                    href={`/search?q=${encodeURIComponent(term)}`}
                     className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm hover:bg-gray-200 transition-colors"
                   >
                     {term}
@@ -216,7 +195,7 @@ function SearchContent() {
 
             {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {filteredProducts.map((product) => (
+              {searchResults.map((product) => (
                 <Link 
                   key={product.id} 
                   href={getProductUrl(product)}
@@ -283,9 +262,27 @@ function SearchContent() {
                         📋 {product.warranty}
                       </div>
                     )}
+
+                    {/* SKU */}
+                    <div className="mt-1 text-xs text-gray-400">
+                      SKU: {product.sku}
+                    </div>
                   </div>
                 </Link>
               ))}
+            </div>
+
+            {/* Back to Shop Link */}
+            <div className="text-center mt-12">
+              <Link
+                href="/shop"
+                className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Browse All Products
+              </Link>
             </div>
           </>
         )}
@@ -294,15 +291,12 @@ function SearchContent() {
   );
 }
 
-// Loading fallback component
 function SearchFallback() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="w-full max-w-[1400px] mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Search Results
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Search Results</h1>
           <div className="animate-pulse">
             <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
             <div className="h-4 bg-gray-200 rounded w-1/4"></div>
@@ -326,7 +320,6 @@ function SearchFallback() {
   );
 }
 
-// Main component with Suspense wrapper
 export default function SearchResults() {
   return (
     <div>

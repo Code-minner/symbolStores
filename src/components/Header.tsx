@@ -1,4 +1,4 @@
-// src/components/Header.tsx - Complete Professional Version
+// src/components/Header.tsx - Using Shared ProductsCache (Much Cleaner!)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -6,22 +6,11 @@ import Image from "next/image";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { searchProducts, Product } from "@/lib/ProductsCache"; // 🔥 Clean import!
 import { useCart } from "@/lib/CartContext";
 import { useWishlist } from "@/lib/WishlistContext";
+import clsx from "clsx";
 
-interface Product {
-  id: string;
-  itemName: string;
-  category: string;
-  subcategory: string;
-  brand: string;
-  amount: number;
-  imageURL: string;
-  slug: string;
-  inStock: boolean;
-}
 
 // Debounce utility function
 const debounce = (func: Function, wait: number) => {
@@ -40,7 +29,6 @@ export default function Header() {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,7 +50,6 @@ export default function Header() {
 
   // Categories configuration
   const categories = [
-    "All Categories",
     "Home & Kitchen",
     "Furniture",
     "TV",
@@ -73,7 +60,6 @@ export default function Header() {
     "Blender",
     "Audio Bass",
     "Washing Machine",
-    // "Others",
   ];
 
   const categorySubItems: { [key: string]: string[] } = {
@@ -103,37 +89,31 @@ export default function Header() {
     Others: ["Accessories", "Parts", "Tools"],
   };
 
-  // Fetch all products on component mount
+  const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setError(null);
-        const productsCollection = collection(db, "products");
-        const productsQuery = query(
-          productsCollection,
-          orderBy("createdAt", "desc")
-        );
-        const productsSnapshot = await getDocs(productsQuery);
+    if (isMobileMenuOpen && categoryButtonRef.current) {
+      const rect = categoryButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+      });
+    }
+  }, [isMobileMenuOpen]);
 
-        const productsData = productsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Product[];
+  const [isMobile, setIsMobile] = useState(false);
 
-        setAllProducts(productsData);
-        console.log("✅ Products loaded:", productsData.length);
-      } catch (err) {
-        console.error("❌ Error fetching products:", err);
-        setError("Failed to load products");
-      }
-    };
-
-    fetchProducts();
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check(); // run on mount
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Debounced search function
+  // 🚀 SUPER CLEAN: Debounced search using shared cache
   const debouncedSearch = useCallback(
-    debounce((searchTerm: string) => {
+    debounce(async (searchTerm: string) => {
       if (!searchTerm.trim()) {
         setSearchResults([]);
         setShowSearchResults(false);
@@ -141,28 +121,22 @@ export default function Header() {
       }
 
       setIsSearching(true);
-      const term = searchTerm.toLowerCase().trim();
+      setError(null);
 
-      const filtered = allProducts
-        .filter((product) => {
-          const searchableFields = [
-            product.itemName,
-            product.brand,
-            product.category,
-            product.subcategory,
-          ]
-            .join(" ")
-            .toLowerCase();
-
-          return searchableFields.includes(term);
-        })
-        .slice(0, 8);
-
-      setSearchResults(filtered);
-      setShowSearchResults(true);
-      setIsSearching(false);
+      try {
+        // 🔥 ONE LINE! All caching handled automatically
+        const results = await searchProducts(searchTerm);
+        setSearchResults(results.slice(0, 8)); // Show max 8 results in dropdown
+        setShowSearchResults(true);
+      } catch (err) {
+        console.error("Search error:", err);
+        setError("Search failed");
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
     }, 300),
-    [allProducts]
+    []
   );
 
   // Search products as user types
@@ -182,9 +156,7 @@ export default function Header() {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Close mobile menu on route change
@@ -195,7 +167,7 @@ export default function Header() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (search.trim() && searchResults.length > 0) {
+    if (search.trim()) {
       router.push(`/shop?search=${encodeURIComponent(search.trim())}`);
       setShowSearchResults(false);
     }
@@ -279,33 +251,40 @@ export default function Header() {
               )}
             </div>
           ))}
-          {searchResults.length >= 8 && (
-            <div className="p-3 text-center border-t border-gray-200">
-              <button
-                onClick={() => {
-                  router.push(
-                    `/shop?search=${encodeURIComponent(search.trim())}`
-                  );
-                  setShowSearchResults(false);
-                }}
-                className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
-              >
-                View all results for "{search}"
-              </button>
-            </div>
-          )}
+          <div className="p-3 text-center border-t border-gray-200">
+            <button
+              onClick={() => {
+                router.push(
+                  `/shop?search=${encodeURIComponent(search.trim())}`
+                );
+                setShowSearchResults(false);
+              }}
+              className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
+            >
+              View all results for "{search}"
+            </button>
+          </div>
         </>
       ) : (
         search.trim() && (
           <div className="p-4 text-center text-gray-500">
             <p>No products found for "{search}"</p>
-            <Link
-              href="/shop"
-              className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
-              onClick={() => setShowSearchResults(false)}
-            >
-              Browse all products
-            </Link>
+            <div className="mt-2 space-y-1">
+              <Link
+                href={`/shop?search=${encodeURIComponent(search.trim())}`}
+                className="block text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
+                onClick={() => setShowSearchResults(false)}
+              >
+                Search all products
+              </Link>
+              <Link
+                href="/shop"
+                className="block text-gray-600 hover:text-gray-700 text-sm transition-colors"
+                onClick={() => setShowSearchResults(false)}
+              >
+                Browse all categories
+              </Link>
+            </div>
           </div>
         )
       )}
@@ -313,7 +292,7 @@ export default function Header() {
   );
 
   return (
-    <header className="bg-white w-full">
+    <header className="bg-white relative w-full">
       {/* Error Banner */}
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 text-center text-sm">
@@ -332,7 +311,7 @@ export default function Header() {
         className="w-full px-4 py-4 lg:mx-auto"
         style={{ backgroundColor: "var(--header_background)" }}
       >
-        <div className="flex items-center max-w-[1400px] m-auto justify-between gap-4 py-2">
+        <div className="flex items-center max-w-[1400px] relative m-auto justify-between gap-4 py-2">
           {/* Logo */}
           <Link href="/" className="text-xl font-bold text-black">
             <div className="flex items-center cursor-pointer">
@@ -395,7 +374,7 @@ export default function Header() {
 
           {/* User Actions */}
           <div className="flex items-center gap-4 text-sm text-gray-700">
-            {/* Wishlist - Updated with count */}
+            {/* Wishlist */}
             <Link
               href="/wishlist"
               className="flex items-center gap-[8px] hover:text-red-500 cursor-pointer transition-colors"
@@ -430,8 +409,6 @@ export default function Header() {
                     fill="black"
                   />
                 </svg>
-
-                {/* Cart Count Badge */}
                 {state.totalItems > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
                     {state.totalItems > 99 ? "99+" : state.totalItems}
@@ -443,7 +420,7 @@ export default function Header() {
 
             {/* Account */}
             <Link
-              href="/account"
+              href="/dashboard"
               className="flex items-center gap-[8px] hover:text-red-500 cursor-pointer transition-colors"
             >
               <Icon icon="ph:user-bold" className="w-6 h-6" />
@@ -455,10 +432,10 @@ export default function Header() {
 
       {/* Bottom Navigation */}
       <div className="border-t border-gray-200">
-        <div className="w-full px-4 lg:max-w-[1400px] m-auto lg:mx-auto">
+        <div className="w-full px-4 lg:max-w-[1400px] relative m-auto lg:mx-auto">
           {/* Mobile Layout */}
           <div className="w-full sm:hidden flex items-center justify-between py-4">
-            {/* Hamburger Menu Button */}
+            {/* Hamburger Menu Button --------------------------------------------------------------------------------- */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -527,15 +504,35 @@ export default function Header() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden sm:flex items-center py-3 text-lg font-bold gap-4 text-gray-700 justify-between overflow-x-auto">
+          <nav className="hidden sm:flex items-center py-3 text-lg relative font-bold gap-4 text-gray-700 justify-between overflow-x-auto">
+            {/* Hamburger Menu Button */}
+            <button
+              ref={categoryButtonRef}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 rounded-lg transition-colors"
+              aria-label="Toggle menu"
+            >
+              <div
+                className="whitespace-nowrap font-medium cursor-pointer px-6 py-2 rounded-full hover:text-white transition-all duration-300"
+                style={{ backgroundColor: "var(--header_background)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor =
+                    "var(--secondary_color)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor =
+                    "var(--header_background)")
+                }
+              >
+                All Categories
+              </div>
+            </button>
             {categories.map((category, index) => (
               <div
                 key={index}
                 className="whitespace-nowrap font-medium cursor-pointer px-6 py-2 rounded-full hover:text-white transition-all duration-300"
                 onClick={() => handleCategoryClick(category)}
-                style={{
-                  backgroundColor: "var(--header_background)",
-                }}
+                style={{ backgroundColor: "var(--header_background)" }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor =
                     "var(--secondary_color)")
@@ -551,15 +548,28 @@ export default function Header() {
           </nav>
         </div>
       </div>
-
       {/* Mobile Categories Dropdown Menu */}
       {isMobileMenuOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
+            className="block relative max-w-[1400px] inset-0 bg-black bg-opacity-50 z-40"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute top-[140px] left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-2xl z-50 sm:hidden w-[90%] max-w-md">
+          <div
+            className={clsx(
+              "absolute bg-white rounded-lg shadow-2xl z-50 w-[90%] max-w-md",
+              isMobile ? "left-1/2 -translate-x-1/2 top-[140px]" : ""
+            )}
+            style={
+              !isMobile
+                ? {
+                    top: dropdownPosition.top,
+                    left: dropdownPosition.left,
+                    position: "absolute",
+                  }
+                : undefined
+            }
+          >
             <div className="flex max-h-96 overflow-hidden rounded-lg">
               <div className="w-[40%] border-r border-gray-200 overflow-y-auto">
                 {Object.entries(categorySubItems).map(
@@ -630,16 +640,12 @@ export default function Header() {
       {/* Cart Sidebar */}
       {state.isOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-50"
             onClick={closeCart}
           />
-
-          {/* Cart Sidebar */}
           <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl z-50 transform transition-transform duration-300">
             <div className="flex flex-col h-full">
-              {/* Cart Header */}
               <div className="flex items-center justify-between p-4 border-b bg-gray-50">
                 <h3 className="text-lg font-semibold text-gray-900">
                   Shopping Cart ({state.totalItems})
@@ -665,7 +671,6 @@ export default function Header() {
                 </button>
               </div>
 
-              {/* Cart Items */}
               <div className="flex-1 overflow-y-auto p-4">
                 {state.items.length === 0 ? (
                   <div className="text-center py-8">
@@ -790,7 +795,6 @@ export default function Header() {
                 )}
               </div>
 
-              {/* Cart Footer */}
               {state.items.length > 0 && (
                 <div className="border-t p-4 space-y-4 bg-gray-50">
                   <div className="flex justify-between items-center">

@@ -1,89 +1,32 @@
-// src/components/ProductGrid.tsx
+// src/components/ProductGrid.tsx - Using Shared ProductsCache (Super Clean!)
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import ProductCard from "@/components/ProductCard";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, limit, orderBy } from "firebase/firestore";
-
-interface Product {
-  id: string;
-  itemName: string;
-  category: string;
-  subcategory: string;
-  brand: string;
-  amount: number;
-  originalPrice?: number;
-  status: string;
-  sku: string;
-  warranty?: string;
-  imageURL: string;
-  images: string[];
-  inStock: boolean;
-  slug: string;
-  tags?: string[];
-}
-
-// Fisher-Yates shuffle algorithm for true randomization
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
+import { getRandomizedProducts, Product } from "@/lib/ProductsCache"; // 🔥 Clean import!
 
 export default function ProductGrid() {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const productsPerPage = 12; // Increased for better performance
+  const productsPerPage = 12;
 
-  // Randomize products once when loaded - use useMemo to prevent re-shuffling on every render
-  const randomizedProducts = useMemo(() => {
-    if (allProducts.length === 0) return [];
-    return shuffleArray(allProducts);
-  }, [allProducts]);
-
+  // 🔥 SUPER CLEAN: One line to get randomized products with caching!
   useEffect(() => {
     const loadProducts = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // SPEED OPTIMIZATION 1: Fetch recent products first for faster initial load
-        const recentProductsQuery = query(
-          collection(db, "products"),
-          orderBy("createdAt", "desc"),
-          limit(50) // Load first 50 products quickly
-        );
-
-        const snapshot = await getDocs(recentProductsQuery);
-        const recentData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Product[];
-
-        // Set initial data immediately for fast display
-        setAllProducts(recentData);
-        setLoading(false);
-
-        // SPEED OPTIMIZATION 2: Load remaining products in background
-        const allProductsQuery = query(collection(db, "products"));
-        const allSnapshot = await getDocs(allProductsQuery);
-        const allData = allSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Product[];
-
-        // Update with all products (this will trigger randomization)
-        setAllProducts(allData);
+        // 🚀 ONE LINE! All caching handled automatically
+        const randomizedProducts = await getRandomizedProducts();
+        setProducts(randomizedProducts);
 
       } catch (err) {
         console.error("Error loading products:", err);
         setError("Failed to load products. Please try again.");
+      } finally {
         setLoading(false);
       }
     };
@@ -91,14 +34,11 @@ export default function ProductGrid() {
     loadProducts();
   }, []);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(randomizedProducts.length / productsPerPage);
+  // Pagination calculations
+  const totalPages = Math.ceil(products.length / productsPerPage);
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = randomizedProducts.slice(
-    indexOfFirstProduct,
-    indexOfLastProduct
-  );
+  const currentProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
 
   // Generate page numbers with ellipsis
   const getPageNumbers = () => {
@@ -106,34 +46,22 @@ export default function ProductGrid() {
     const showEllipsis = totalPages > 7;
 
     if (!showEllipsis) {
-      // Show all pages if 7 or fewer
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      // Always show first page
       pages.push(1);
-
-      if (currentPage > 3) {
-        pages.push("...");
-      }
-
-      // Show pages around current page
+      if (currentPage > 3) pages.push("...");
+      
       const start = Math.max(2, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
-
+      
       for (let i = start; i <= end; i++) {
         pages.push(i);
       }
-
-      if (currentPage < totalPages - 2) {
-        pages.push("...");
-      }
-
-      // Always show last page if more than 1 page
-      if (totalPages > 1) {
-        pages.push(totalPages);
-      }
+      
+      if (currentPage < totalPages - 2) pages.push("...");
+      if (totalPages > 1) pages.push(totalPages);
     }
 
     return pages;
@@ -141,11 +69,9 @@ export default function ProductGrid() {
 
   const goToPage = (page: number) => {
     setCurrentPage(page);
-    // Scroll to top when changing pages
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // SPEED OPTIMIZATION 3: Improved loading skeleton
   if (loading) {
     return (
       <section className="my-10">
@@ -173,7 +99,6 @@ export default function ProductGrid() {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <section className="my-10">
@@ -190,8 +115,7 @@ export default function ProductGrid() {
     );
   }
 
-  // Empty state
-  if (randomizedProducts.length === 0) {
+  if (products.length === 0) {
     return (
       <section className="my-10">
         <div className="text-center py-12">
@@ -204,11 +128,11 @@ export default function ProductGrid() {
 
   return (
     <section className="my-10">
+      {/* Section Header */}
       <div className="flex justify-between items-center mt-16 mb-6">
         <h2 className="text-[16px] sm:text-[22px] font-medium text-gray-800 relative">
           Products
-          {/* Show total count */}
-          <span className="text-sm text-gray-500 ml-2">({randomizedProducts.length} items)</span>
+          <span className="text-sm text-gray-500 ml-2">({products.length} items)</span>
         </h2>
         <a
           href="/shop"
@@ -218,19 +142,20 @@ export default function ProductGrid() {
         </a>
       </div>
 
+      {/* Decorative Line */}
       <div className="relative mb-6">
         <span className="relative z-10 block w-[20%] h-1 mt-1 bg-blue-400 rounded-full"></span>
         <span className="absolute left-[0%] top-[40%] block w-[100%] h-0.5 bg-gray-100 mb-1 rounded-full"></span>
       </div>
 
-      {/* Product Grid - IMPROVED SPACING */}
+      {/* Product Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 mb-8">
         {currentProducts.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
 
-      {/* Pagination - IMPROVED SPACING */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-1 sm:gap-2 flex-wrap px-2">
           {/* Previous Button */}
@@ -243,37 +168,16 @@ export default function ProductGrid() {
                 : "bg-white text-[#FF3A00] hover:bg-gray-50 border-gray-300 hover:border-[#FF3A00]"
             }`}
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 23"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M19.9294 11.5322H4.20074"
-                stroke="currentColor"
-                strokeWidth="1.42988"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M10.6352 5.09766L4.20074 11.5321L10.6352 17.9666"
-                stroke="currentColor"
-                strokeWidth="1.42988"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+            <svg width="20" height="20" viewBox="0 0 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M19.9294 11.5322H4.20074" stroke="currentColor" strokeWidth="1.42988" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M10.6352 5.09766L4.20074 11.5321L10.6352 17.9666" stroke="currentColor" strokeWidth="1.42988" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
 
           {/* Page Numbers */}
           {getPageNumbers().map((page, index) =>
             page === "..." ? (
-              <span
-                key={`ellipsis-${index}`}
-                className="px-2 py-2 text-gray-400 min-w-[32px] text-center"
-              >
+              <span key={`ellipsis-${index}`} className="px-2 py-2 text-gray-400 min-w-[32px] text-center">
                 ...
               </span>
             ) : (
@@ -301,27 +205,9 @@ export default function ProductGrid() {
                 : "bg-white text-[#FF3A00] hover:bg-gray-50 border-gray-300 hover:border-[#FF3A00]"
             }`}
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 23"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4.37152 11.5322H20.1002"
-                stroke="currentColor"
-                strokeWidth="1.42988"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M13.6657 5.09766L20.1002 11.5321L13.6657 17.9666"
-                stroke="currentColor"
-                strokeWidth="1.42988"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+            <svg width="20" height="20" viewBox="0 0 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4.37152 11.5322H20.1002" stroke="currentColor" strokeWidth="1.42988" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13.6657 5.09766L20.1002 11.5321L13.6657 17.9666" stroke="currentColor" strokeWidth="1.42988" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>

@@ -110,8 +110,8 @@ export default function ProductCard({
         boxSizing: "border-box",
         margin: 0,
         width: "100%", // ✅ ONLY CHANGE: Use full available width
-        minWidth: "200px", // ✅ ONLY CHANGE: Set minimum width for consistency
-        maxWidth: "280px",
+        minWidth: "100%", // ✅ ONLY CHANGE: Set minimum width for consistency
+        maxWidth: "100%",
         height: showAddToCart ? "420px" : "350px",
         backgroundColor: "#fff",
         padding: "10px",
@@ -165,7 +165,7 @@ export default function ProductCard({
               src={product.imageURL}
               alt={product.itemName}
               fill
-              sizes="280px"
+              className="w-[100%] h-[100%] object-cover"
               style={{
                 objectFit: "cover",
                 transition: "transform 0.3s ease, filter 0.3s ease",
@@ -261,13 +261,13 @@ export default function ProductCard({
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              margin: "10px 0",
+              margin: "5px 0",
             }}
           >
             <div>
               <p
+              className="text-[1rem] sm:text-[1.5rem]"
                 style={{
-                  fontSize: "1.5rem",
                   fontWeight: "bold",
                   color: "#1f2937",
                   margin: 0,

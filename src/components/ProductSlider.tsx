@@ -58,7 +58,7 @@ export default function ProductSlider({ products }: { products: Product[] }) {
           spaceBetween={16}
           speed={800}
           breakpoints={{
-            320: { slidesPerView: 1 },
+            350: { slidesPerView: 2 },
             640: { slidesPerView: 2 },
             768: { slidesPerView: 3 },
             1024: { slidesPerView: 4 },

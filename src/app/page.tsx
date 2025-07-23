@@ -10,8 +10,7 @@ import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
 import CustomHeroCarousel from "@/components/HeroCarousel";
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+ import { getAllProducts } from '@/lib/ProductsCache';
 
 // Define the Brand interface
 interface Brand {
@@ -94,18 +93,21 @@ export default function Home() {
   // ✅ FIXED: Properly type the products state
   const [products, setProducts] = useState<Product[]>([]);
 
-  useEffect(() => {
-    const load = async () => {
-      const querySnapshot = await getDocs(collection(db, "products"));
-      const data = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Product[]; // ✅ FIXED: Type assertion
+useEffect(() => {
+  const load = async () => {
+    try {
+      const data = await getAllProducts();
       setProducts(data);
-    };
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+  load();
+}, []);
 
-    load();
-  }, []);
+ 
+
+
 
   return (
     <div className="flex flex-col w-full">
@@ -234,7 +236,7 @@ export default function Home() {
             {productSub.map((productSub) => (
               <div
                 key={productSub.id}
-                className="border-2 border-transparent hover:border-blue-400 transition rounded-lg p-4 relative group"
+                className="border-2 border-transparent hover:border-[#FF0000] transition rounded-lg p-4 relative group"
               >
                 <Link
                   key={productSub.id}
@@ -252,8 +254,8 @@ export default function Home() {
 
                     {/* Icons */}
                     <div className="absolute right-2 bottom-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition">
-                      <button className="bg-white p-2 rounded-full shadow hover:bg-gray-100">
-                        💙
+                      <button className="bg-white-0 text-[14px] px-4 py-2 border-2 border-[#FF0000] text-[#FF0000]  rounded-full shadow hover:bg-[#FF0000] hover:text-white transition">
+                        View More
                       </button>
                     </div>
                   </div>

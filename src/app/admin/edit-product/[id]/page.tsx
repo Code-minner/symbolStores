@@ -70,12 +70,17 @@ export default function EditProductPage() {
     "Others": ["Accessories", "Parts", "Tools", "Gadgets"]
   };
 
-  const brands = [
-    "Samsung", "LG", "Sony", "Panasonic", "Hisense", "TCL", "Haier", 
-    "Thermocool", "Scanfrost", "Nexus", "Bruhm", "Midea", "Kenstar",
-    "Binatone", "Philips", "Bosch", "Whirlpool", "Electrolux", "Sharp",
-    "Toshiba", "Grundig", "Polystar", "Century", "Maxi", "Others", "ELEPAQ"
-  ];
+const brands = [
+  "Samsung", "Huawei","Gotv", "Haier Thermocol", "Hisense", "Bruhm", "LG", "DAIKIN", "KENWOOD",
+  "Binatone", "Panasonic", "Scanfrost", "Sony", "SUMEC", "GREE", "Midea",
+  "MAXI",  "Aeon", "Toshiba", "KENSTAR", "TCL", "Royal",
+  "Rite-Tek", "SYINIX", "INFINIX", "DELTA", "TRANE", "beko", "F&D",
+  "HOME FLOWER", "HARVELLS", "OX", "Century", "Nexus", "Nature Power",
+  "Navkar", "D-MARC", "Sonik", "Enkor", "Saisho", "Firman", "Power Deluxe",
+  "Itel Safer", "VBT-AX", "APC", "ZVT", "Sollatek", "TBK BIANCO", "Tigmax",
+  "ELEPAQ", "KEMAGE"
+];
+
 
   // Check admin access and load product
   useEffect(() => {

@@ -10,10 +10,8 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductSlider from "@/components/ProductSlider";
-import { db } from "@/lib/firebase"; // Adjust path if needed
-import { collection, getDocs } from "firebase/firestore";
 
-
+import { getAllProducts } from "@/lib/ProductsCache";
 
 // ✅ FIXED: Add missing Product interface
 interface Product {
@@ -143,27 +141,25 @@ export default function WishlistPage() {
   };
 
   const [products, setProducts] = useState<Product[]>([]);
-const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
-useEffect(() => {
-  const fetchProducts = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "products"));
-      const fetchedProducts = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Product[];
-
-      setProducts(fetchedProducts);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
-
-  fetchProducts();
-}, []);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        console.log("🔥 Wishlist: Loading products via cache...");
+        const fetchedProducts = await getAllProducts();
+        setProducts(fetchedProducts);
+        console.log(
+          `✅ Wishlist: Loaded ${fetchedProducts.length} products via cache`
+        );
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   const getProductUrl = (item: any) => {
     return `/home/${item.category
@@ -774,7 +770,6 @@ useEffect(() => {
         </div>
         <ProductSlider products={products} />
       </div>
-      
 
       <Footer />
     </div>

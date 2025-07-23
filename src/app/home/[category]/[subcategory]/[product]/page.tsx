@@ -2,8 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { getAllProducts, Product } from "@/lib/ProductsCache";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Image from "next/image";
@@ -19,26 +18,6 @@ interface ProductDetailsProps {
     subcategory: string;
     product: string;
   }>;
-}
-
-interface Product {
-  id: string;
-  itemName: string;
-  category: string;
-  subcategory: string;
-  brand: string;
-  description: string;
-  features: string[];
-  amount: number;
-  originalPrice?: number;
-  status: string;
-  sku: string;
-  warranty?: string;
-  imageURL: string;
-  images: string[];
-  inStock: boolean;
-  slug: string;
-  tags: string[];
 }
 
 export default function ProductDetails({ params }: ProductDetailsProps) {
@@ -104,29 +83,28 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
     const fetchProduct = async () => {
       try {
         setLoading(true);
-        const productsCollection = collection(db, "products");
-        const productQuery = query(
-          productsCollection,
-          where("slug", "==", resolvedParams.product)
+        console.log(
+          "🔍 Finding product in cache by slug:",
+          resolvedParams.product
         );
 
-        const querySnapshot = await getDocs(productQuery);
+        // Get all products from cache
+        const allProducts = await getAllProducts();
 
-        if (querySnapshot.empty) {
+        // Find the product by slug
+        const foundProduct = allProducts.find(
+          (p) => p.slug === resolvedParams.product
+        );
+
+        if (!foundProduct) {
           setError("Product not found");
           return;
         }
 
-        const productDoc = querySnapshot.docs[0];
-        const productData = {
-          id: productDoc.id,
-          ...productDoc.data(),
-        } as Product;
-
-        setProduct(productData);
-        console.log("Fetched product:", productData);
+        setProduct(foundProduct);
+        console.log("✅ Found product in cache:", foundProduct.itemName);
       } catch (err) {
-        console.error("Error fetching product:", err);
+        console.error("Error finding product:", err);
         setError("Failed to load product. Please try again.");
       } finally {
         setLoading(false);
@@ -341,7 +319,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
       <div className="w-full max-w-[1400px] mx-auto">
         <div className="min-h-[100%] pb-8 pt-8">
           {/* Breadcrumb with Home Icon */}
-          <div className="w-[95%] overflow-x-auto py-3 px-4 mr-4">
+          <div className="w-[95%] overflow-x-auto py-3 pr-4 mr-4">
             <nav className="flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
               {breadcrumbs.map((item, index) => (
                 <React.Fragment key={index}>
