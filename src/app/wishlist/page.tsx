@@ -161,12 +161,18 @@ export default function WishlistPage() {
     fetchProducts();
   }, []);
 
+  // ✅ FIXED: Added null checks to prevent runtime error
   const getProductUrl = (item: any) => {
-    return `/home/${item.category
+    // Handle missing category or subcategory
+    const category = item.category || "unknown";
+    const subcategory = item.subcategory || "unknown";
+    const slug = item.slug || item.id;
+
+    return `/home/${category
       .toLowerCase()
-      .replace(/\s+/g, "-")}/${item.subcategory
+      .replace(/\s+/g, "-")}/${subcategory
       .toLowerCase()
-      .replace(/\s+/g, "-")}/${item.slug}`;
+      .replace(/\s+/g, "-")}/${slug}`;
   };
 
   if (authLoading || wishlistLoading) {
@@ -200,7 +206,7 @@ export default function WishlistPage() {
       <div>
         <Header />
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
+          <div className="text-center px-4">
             <div className="mb-8">
               <svg
                 className="w-24 h-24 mx-auto text-gray-300"
@@ -369,7 +375,8 @@ export default function WishlistPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 justify-items-center">
+          {/* ✅ FIXED: Added proper spacing between cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 justify-items-center">
             {wishlistItems.map((item) => (
               <div
                 key={item.id}
@@ -768,7 +775,15 @@ export default function WishlistPage() {
             </div>
           )}
         </div>
-        <ProductSlider products={products} />
+        
+        {/* ✅ FIXED: Filter products to only pass valid ones to ProductSlider */}
+        <ProductSlider 
+          products={products.filter(product => 
+            product.category && 
+            product.subcategory && 
+            product.slug
+          )} 
+        />
       </div>
 
       <Footer />

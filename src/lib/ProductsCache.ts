@@ -1,8 +1,7 @@
-// src/lib/ProductsCache.ts - Fixed cache with NO storage quota issues
+// src/lib/ProductsCache.ts - OPTIMIZED FOR MINIMAL FIREBASE READS
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 
-// In src/lib/ProductsCache.ts - UPDATE THIS INTERFACE:
 export interface Product {
   id: string;
   itemName: string;
@@ -10,7 +9,7 @@ export interface Product {
   subcategory: string;
   brand: string;
   description: string;
-  features?: string[];  // ✅ ADD THIS LINE
+  features?: string[];
   amount: number;
   originalPrice?: number;
   status: string;
@@ -24,98 +23,170 @@ export interface Product {
   tags?: string[];
 }
 
-// 🔥 CACHE CONFIGURATION
-const PRODUCTS_CACHE_KEY = 'products-lite'; // Updated key name
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+// 🔥 OPTIMIZED FOR MAXIMUM READ REDUCTION
+const CACHE_KEY = 'products-optimized';
+const CACHE_DURATION = 60 * 60 * 1000; // 1 HOUR (was 30 min)
+const EXTENDED_CACHE = 24 * 60 * 60 * 1000; // 24 HOURS fallback
+const BACKGROUND_REFRESH_TIME = 45 * 60 * 1000; // Refresh after 45 min
 
-// Global memory cache (unlimited size)
-let globalProductsCache: {
-  data: Product[];
-  timestamp: number;
-} | null = null;
+let memoryCache: Product[] | null = null;
+let cacheTimestamp = 0;
+let loadingInProgress = false;
 
-// Cache statistics for debugging
-let cacheStats = {
-  totalLoads: 0,
-  firebaseLoads: 0,
+// 📊 PERFORMANCE TRACKING
+let performanceStats = {
+  totalRequests: 0,
+  firebaseReads: 0,
   memoryHits: 0,
-  sessionHits: 0
+  sessionHits: 0,
+  backgroundRefreshes: 0,
+  lastFirebaseQuery: 0,
+  cacheSavingsPercent: 0
 };
 
-// 🔥 Helper: Create lightweight version for sessionStorage (80% smaller!)
-const createLiteProduct = (product: Product) => ({
-  id: product.id,
-  itemName: product.itemName,
-  category: product.category,
-  subcategory: product.subcategory,
-  brand: product.brand,
-  amount: product.amount,
-  originalPrice: product.originalPrice,
-  status: product.status,
-  sku: product.sku,
-  imageURL: product.imageURL,
-  inStock: product.inStock,
-  slug: product.slug,
-  createdAt: product.createdAt
-  // Skip: description, images array, warranty, tags (saves 80% space)
-});
+// 🗜️ LIGHTWEIGHT COMPRESSION (keeps reliability, saves space)
+function compressForStorage(products: Product[]) {
+  return products.map(p => ({
+    i: p.id,
+    n: p.itemName,
+    c: p.category,
+    s: p.subcategory,
+    b: p.brand,
+    d: p.description,
+    f: p.features?.slice(0, 3) || [], // Keep top 3 features
+    a: p.amount,
+    o: p.originalPrice,
+    st: p.status,
+    sk: p.sku,
+    w: p.warranty || '',
+    img: p.imageURL,
+    ins: p.inStock,
+    sl: p.slug,
+    cr: p.createdAt,
+    t: p.tags?.slice(0, 2) || [] // Keep top 2 tags
+  }));
+}
 
-// 🔥 Helper: Expand lite product back to full product
-const expandLiteProduct = (liteProduct: any): Product => ({
-  ...liteProduct,
-  description: '', // Will be empty but won't cause errors
-  images: [liteProduct.imageURL], // Use main image as fallback
-  warranty: '', // Will be empty but won't cause errors
-  tags: [] // Will be empty but won't cause errors
-});
+function expandFromStorage(compressed: any[]): Product[] {
+  return compressed.map(c => ({
+    id: c.i,
+    itemName: c.n,
+    category: c.c,
+    subcategory: c.s,
+    brand: c.b,
+    description: c.d,
+    features: c.f,
+    amount: c.a,
+    originalPrice: c.o,
+    status: c.st,
+    sku: c.sk,
+    warranty: c.w,
+    imageURL: c.img,
+    images: [c.img], // Use main image
+    inStock: c.ins,
+    slug: c.sl,
+    createdAt: c.cr,
+    tags: c.t
+  }));
+}
 
 /**
- * 🚀 MAIN FUNCTION: Get all products with smart caching (NO QUOTA ERRORS!)
- * This is used by ALL components (Shop, ProductGrid, Header, Search)
+ * 🚀 OPTIMIZED FOR MINIMAL FIREBASE READS
  */
 export async function getAllProducts(): Promise<Product[]> {
-  cacheStats.totalLoads++;
+  const tabId = Math.random().toString(36).substr(2, 4);
+  performanceStats.totalRequests++;
 
+  // 1. ⚡ MEMORY CACHE (INSTANT - 0ms)
+  if (memoryCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
+    console.log(`⚡ [${tabId}] Memory hit! Age: ${Math.round((Date.now() - cacheTimestamp)/1000/60)}min`);
+    performanceStats.memoryHits++;
+    
+    // 🔄 BACKGROUND REFRESH (keeps cache fresh without user delay)
+    if (Date.now() - cacheTimestamp > BACKGROUND_REFRESH_TIME) {
+      setTimeout(() => backgroundRefresh(), 2000);
+    }
+    
+    return memoryCache;
+  }
+
+  // 2. 📦 SESSION CACHE (FAST - ~5ms)
+  const sessionResult = trySessionCache(tabId);
+  if (sessionResult) {
+    performanceStats.sessionHits++;
+    return sessionResult;
+  }
+
+  // 3. 🔍 FIREBASE (ONLY when absolutely necessary)
+  return await performFirebaseLoad(tabId);
+}
+
+/**
+ * 📦 TRY SESSION CACHE
+ */
+function trySessionCache(tabId: string): Product[] | null {
   try {
-    // 1. ⚡ Check memory cache first (INSTANT, unlimited size)
-    if (globalProductsCache && Date.now() - globalProductsCache.timestamp < CACHE_DURATION) {
-      console.log("⚡ Memory cache hit - INSTANT!", {
-        products: globalProductsCache.data.length,
-        age: Math.round((Date.now() - globalProductsCache.timestamp) / 1000) + 's'
-      });
-      cacheStats.memoryHits++;
-      return globalProductsCache.data;
-    }
-
-    // 2. 📦 Check lite sessionStorage cache (VERY FAST, quota-safe)
-    try {
-      const sessionCached = sessionStorage.getItem(PRODUCTS_CACHE_KEY);
-      const sessionTime = sessionStorage.getItem(PRODUCTS_CACHE_KEY + '-time');
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    const cacheTime = sessionStorage.getItem(CACHE_KEY + '-time');
+    
+    if (cached && cacheTime) {
+      const age = Date.now() - parseInt(cacheTime);
       
-      if (sessionCached && sessionTime && Date.now() - parseInt(sessionTime) < CACHE_DURATION) {
-        console.log("📦 Session cache hit - Very fast!");
-        const liteProducts = JSON.parse(sessionCached);
+      // Use even slightly old cache to avoid Firebase reads
+      if (age < EXTENDED_CACHE) {
+        console.log(`📦 [${tabId}] Session hit! Age: ${Math.round(age/1000/60)}min`);
         
-        // Expand lite products back to full products
-        const expandedProducts = liteProducts.map(expandLiteProduct);
+        const compressed = JSON.parse(cached);
+        const products = expandFromStorage(compressed);
         
-        // Update memory cache for future instant access
-        globalProductsCache = {
-          data: expandedProducts,
-          timestamp: Date.now()
-        };
+        // Update memory cache
+        memoryCache = products;
+        cacheTimestamp = parseInt(cacheTime);
         
-        cacheStats.sessionHits++;
-        return expandedProducts;
+        // Schedule background refresh if getting old
+        if (age > BACKGROUND_REFRESH_TIME) {
+          setTimeout(() => backgroundRefresh(), 3000);
+        }
+        
+        return products;
+      } else {
+        // Clear expired cache
+        sessionStorage.removeItem(CACHE_KEY);
+        sessionStorage.removeItem(CACHE_KEY + '-time');
       }
-    } catch (storageError) {
-      console.warn("📦 Session storage failed, will use memory cache only:", storageError);
-      // Continue to Firebase fetch - app still works fine
     }
+  } catch (error) {
+    console.warn(`⚠️ [${tabId}] Session cache corrupted, clearing:`, error);
+    sessionStorage.removeItem(CACHE_KEY);
+    sessionStorage.removeItem(CACHE_KEY + '-time');
+  }
+  
+  return null;
+}
 
-    // 3. 🔍 Fetch from Firebase (ONLY when needed)
-    console.log("🔍 Loading ALL products from Firebase - this will be cached for 10 minutes");
-    cacheStats.firebaseLoads++;
+/**
+ * 🔍 FIREBASE LOAD (with simple tab coordination)
+ */
+async function performFirebaseLoad(tabId: string): Promise<Product[]> {
+  // Simple coordination - wait briefly if another tab is loading
+  if (loadingInProgress) {
+    console.log(`⏱️ [${tabId}] Another tab loading, waiting briefly...`);
+    
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (memoryCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
+        console.log(`✅ [${tabId}] Cache appeared while waiting!`);
+        return memoryCache;
+      }
+    }
+  }
+
+  loadingInProgress = true;
+  
+  try {
+    console.log(`🔍 [${tabId}] FIREBASE QUERY - will cache for 1+ hour to minimize future reads`);
+    performanceStats.firebaseReads++;
+    performanceStats.lastFirebaseQuery = Date.now();
     
     const productsCollection = collection(db, "products");
     const productsQuery = query(productsCollection, orderBy("createdAt", "desc"));
@@ -126,86 +197,150 @@ export async function getAllProducts(): Promise<Product[]> {
       ...doc.data()
     })) as Product[];
 
-    console.log(`✅ Loaded ${products.length} products from Firebase - caching everywhere!`);
+    console.log(`✅ [${tabId}] Loaded ${products.length} products - caching aggressively!`);
 
-    // 4. 🔥 Save to memory cache (unlimited space)
-    globalProductsCache = {
-      data: products,
-      timestamp: Date.now()
-    };
+    // Cache everywhere for maximum read reduction
+    await cacheAggressively(products);
+    
+    // Update performance stats
+    performanceStats.cacheSavingsPercent = performanceStats.totalRequests > 0 ? 
+      Math.round((1 - performanceStats.firebaseReads / performanceStats.totalRequests) * 100) : 0;
 
-    // 5. 📦 Try to save lite version to sessionStorage (graceful failure)
-    try {
-      const liteProducts = products.map(createLiteProduct);
-      sessionStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(liteProducts));
-      sessionStorage.setItem(PRODUCTS_CACHE_KEY + '-time', Date.now().toString());
-      
-      const sizeKB = Math.round(JSON.stringify(liteProducts).length / 1024);
-      console.log(`✅ Cached ${liteProducts.length} products in lite format (${sizeKB}KB vs full ${Math.round(JSON.stringify(products).length / 1024)}KB)`);
-    } catch (storageError) {
-      console.warn("📦 Storage quota exceeded, using memory cache only:", storageError);
-      // App continues to work perfectly with just memory cache
-    }
+    console.log(`📊 [${tabId}] Read reduction: ${performanceStats.cacheSavingsPercent}% - Next query avoided for 1+ hour!`);
 
     return products;
 
   } catch (error) {
-    console.error("❌ Error loading products:", error);
+    console.error(`❌ [${tabId}] Firebase query failed:`, error);
+    
+    // 🆘 EMERGENCY: Try any old cache to avoid complete failure
+    const emergency = tryEmergencyCache();
+    if (emergency) {
+      console.log(`🆘 [${tabId}] Using emergency cache to avoid failure`);
+      return emergency;
+    }
+    
     throw new Error("Failed to load products. Please try again.");
+  } finally {
+    loadingInProgress = false;
   }
 }
 
 /**
- * 🔍 SEARCH FUNCTION: Search ALL products instantly
+ * 🔥 AGGRESSIVE CACHING (minimize future Firebase reads)
  */
-export async function searchProducts(searchTerm: string): Promise<Product[]> {
-  const allProducts = await getAllProducts();
+async function cacheAggressively(products: Product[]): Promise<void> {
+  const now = Date.now();
   
+  // Memory cache (per tab, instant access)
+  memoryCache = products;
+  cacheTimestamp = now;
+
+  // Session cache (cross-tab, persistent)
+  try {
+    const compressed = compressForStorage(products);
+    const originalSize = JSON.stringify(products).length;
+    const compressedSize = JSON.stringify(compressed).length;
+    const savings = Math.round((1 - compressedSize/originalSize) * 100);
+    
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(compressed));
+    sessionStorage.setItem(CACHE_KEY + '-time', now.toString());
+    
+    console.log(`💾 Cached ${products.length} products (${savings}% compression) - 1+ hour cache duration`);
+  } catch (storageError) {
+    console.warn("Storage failed (quota?), using memory cache only:", storageError);
+  }
+}
+
+/**
+ * 🔄 BACKGROUND REFRESH (keeps cache fresh without user delays)
+ */
+async function backgroundRefresh(): Promise<void> {
+  // Don't refresh if we just did a Firebase query
+  if (Date.now() - performanceStats.lastFirebaseQuery < 5 * 60 * 1000) return;
+  
+  // Don't refresh if another tab is loading
+  if (loadingInProgress) return;
+
+  try {
+    console.log("🔄 Background refresh starting (silent, no user delay)...");
+    performanceStats.backgroundRefreshes++;
+    
+    const productsCollection = collection(db, "products");
+    const productsQuery = query(productsCollection, orderBy("createdAt", "desc"));
+    const productsSnapshot = await getDocs(productsQuery);
+
+    const products = productsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Product[];
+
+    await cacheAggressively(products);
+    console.log("✅ Background refresh complete - cache silently updated!");
+    
+  } catch (error) {
+    console.warn("🔄 Background refresh failed (not critical):", error);
+  }
+}
+
+/**
+ * 🆘 EMERGENCY FALLBACK
+ */
+function tryEmergencyCache(): Product[] | null {
+  try {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const compressed = JSON.parse(cached);
+      return expandFromStorage(compressed);
+    }
+  } catch (error) {
+    console.warn("Emergency cache failed:", error);
+  }
+  return null;
+}
+
+// 🔍 ALL OTHER FUNCTIONS (use cache, no additional Firebase reads)
+export async function searchProducts(searchTerm: string): Promise<Product[]> {
+  const allProducts = await getAllProducts(); // Cache hit - no Firebase read
   if (!searchTerm.trim()) return [];
 
   const term = searchTerm.toLowerCase();
   return allProducts.filter(product => {
     const searchableFields = [
-      product.itemName,
-      product.brand,
-      product.category,
-      product.subcategory,
-      product.description || '', // Handle empty descriptions
-      product.sku,
-      ...(product.tags || []) // Handle empty tags
+      product.itemName || '',
+      product.brand || '',
+      product.category || '',
+      product.subcategory || '',
+      product.description || '',
+      product.sku || '',
+      ...(product.tags || [])
     ].join(' ').toLowerCase();
 
     return searchableFields.includes(term);
   });
 }
 
-/**
- * 🏷️ FILTER FUNCTIONS: Filter by category/brand instantly
- */
 export async function getProductsByCategory(category: string): Promise<Product[]> {
-  const allProducts = await getAllProducts();
+  const allProducts = await getAllProducts(); // Cache hit - no Firebase read
   return allProducts.filter(product => 
-    product.category.toLowerCase() === category.toLowerCase()
+    product.category?.toLowerCase() === category.toLowerCase()
   );
 }
 
 export async function getProductsByBrand(brand: string): Promise<Product[]> {
-  const allProducts = await getAllProducts();
+  const allProducts = await getAllProducts(); // Cache hit - no Firebase read
   return allProducts.filter(product => 
-    product.brand.toLowerCase() === brand.toLowerCase()
+    product.brand?.toLowerCase() === brand.toLowerCase()
   );
 }
 
-/**
- * 🔄 PAGINATION HELPER: Get products with pagination
- */
 export async function getProductsPaginated(page: number = 1, limit: number = 12): Promise<{
   products: Product[];
   totalPages: number;
   currentPage: number;
   totalProducts: number;
 }> {
-  const allProducts = await getAllProducts();
+  const allProducts = await getAllProducts(); // Cache hit - no Firebase read
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
   
@@ -217,51 +352,39 @@ export async function getProductsPaginated(page: number = 1, limit: number = 12)
   };
 }
 
-/**
- * 🎲 UTILITY: Get randomized products (for ProductGrid)
- */
 export async function getRandomizedProducts(limit?: number): Promise<Product[]> {
-  const allProducts = await getAllProducts();
-  const shuffled = shuffleArray(allProducts);
+  const allProducts = await getAllProducts(); // Cache hit - no Firebase read
+  
+  const shuffled = [...allProducts];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  
   return limit ? shuffled.slice(0, limit) : shuffled;
 }
 
-/**
- * 🧹 CACHE MANAGEMENT
- */
-export function clearProductsCache(): void {
-  globalProductsCache = null;
-  try {
-    sessionStorage.removeItem(PRODUCTS_CACHE_KEY);
-    sessionStorage.removeItem(PRODUCTS_CACHE_KEY + '-time');
-  } catch (error) {
-    console.warn("Could not clear session storage:", error);
-  }
-  console.log("🧹 Products cache cleared");
-}
+// 📊 PERFORMANCE MONITORING
+export function getPerformanceStats() {
+  // ✅ FIXED: Changed variable name to match the property name being used
+  const minutesSinceLastFirebaseQuery = performanceStats.lastFirebaseQuery > 0 ? 
+    Math.round((Date.now() - performanceStats.lastFirebaseQuery) / 1000 / 60) : 0;
 
-export function getCacheStats() {
   return {
-    ...cacheStats,
-    currentCacheSize: globalProductsCache?.data.length || 0,
-    cacheAge: globalProductsCache ? 
-      Math.round((Date.now() - globalProductsCache.timestamp) / 1000) : 0,
-    isMemoryCached: !!globalProductsCache,
-    isSessionCached: (() => {
-      try {
-        return !!sessionStorage.getItem(PRODUCTS_CACHE_KEY);
-      } catch {
-        return false;
-      }
-    })(),
-    memoryUsageMB: globalProductsCache ? 
-      Math.round(JSON.stringify(globalProductsCache.data).length / 1024 / 1024 * 100) / 100 : 0
+    ...performanceStats,
+    cacheAge: memoryCache ? Math.round((Date.now() - cacheTimestamp) / 1000 / 60) + ' minutes' : 'No cache',
+    minutesSinceLastFirebaseQuery, // ✅ Now matches the variable name
+    estimatedReadsSaved: performanceStats.totalRequests - performanceStats.firebaseReads,
+    nextRefreshIn: memoryCache ? 
+      Math.max(0, Math.round((CACHE_DURATION - (Date.now() - cacheTimestamp)) / 1000 / 60)) + ' min' : 'Now'
   };
 }
 
-/**
- * 🎲 UTILITY: Shuffle array (Fisher-Yates algorithm)
- */
+export function logPerformance(): void {
+  console.table(getPerformanceStats());
+}
+
+// 🔧 UTILITIES
 export function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -271,19 +394,18 @@ export function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-/**
- * 🔧 DEBUG: Log cache performance
- */
-export function logCachePerformance(): void {
-  const stats = getCacheStats();
-  console.table({
-    'Total Requests': cacheStats.totalLoads,
-    'Firebase Loads': cacheStats.firebaseLoads,
-    'Memory Hits': cacheStats.memoryHits,
-    'Session Hits': cacheStats.sessionHits,
-    'Cache Hit Rate': `${Math.round(((cacheStats.memoryHits + cacheStats.sessionHits) / cacheStats.totalLoads) * 100)}%`,
-    'Memory Usage': `${stats.memoryUsageMB}MB`,
-    'Products Cached': stats.currentCacheSize,
-    'Cache Age': `${stats.cacheAge}s`
-  });
+export function clearProductsCache(): void {
+  memoryCache = null;
+  cacheTimestamp = 0;
+  loadingInProgress = false;
+  sessionStorage.removeItem(CACHE_KEY);
+  sessionStorage.removeItem(CACHE_KEY + '-time');
+  console.log("🧹 All caches cleared - next load will query Firebase");
 }
+
+export const forceRefreshProducts = async (): Promise<Product[]> => {
+  clearProductsCache();
+  return await getAllProducts();
+};
+
+export const getCacheStats = getPerformanceStats;

@@ -34,18 +34,60 @@ function ShopContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [productsPerPage] = useState(12);
 
-  // Brands list 
-const allBrands = [
-  "Gotv", "Haier Thermocol", "Hisense", "Bruhm", "LG", "DAIKIN", "KENWOOD",
-  "Binatone", "Panasonic", "Scanfrost", "Sony", "SUMEC", "GREE", "Midea",
-  "MAXI", "Samsung", "Huawei", "Aeon", "Toshiba", "KENSTAR", "TCL", "Royal",
-  "Rite-Tek", "SYINIX", "INFINIX", "DELTA", "TRANE", "beko", "F&D",
-  "HOME FLOWER", "HARVELLS", "OX", "Century", "Nexus", "Nature Power",
-  "Navkar", "D-MARC", "Sonik", "Enkor", "Saisho", "Firman", "Power Deluxe",
-  "Itel Safer", "VBT-AX", "APC", "ZVT", "Sollatek", "TBK BIANCO", "Tigmax",
-  "ELEPAQ", "KEMAGE"
-];
-
+  // Brands list
+  const allBrands = [
+    "Gotv",
+    "Haier Thermocol",
+    "Hisense",
+    "Bruhm",
+    "LG",
+    "DAIKIN",
+    "KENWOOD",
+    "Binatone",
+    "Panasonic",
+    "Scanfrost",
+    "Sony",
+    "SUMEC",
+    "GREE",
+    "Midea",
+    "MAXI",
+    "Samsung",
+    "Huawei",
+    "Aeon",
+    "Toshiba",
+    "KENSTAR",
+    "TCL",
+    "Royal",
+    "Rite-Tek",
+    "SYINIX",
+    "INFINIX",
+    "DELTA",
+    "TRANE",
+    "beko",
+    "F&D",
+    "HOME FLOWER",
+    "HARVELLS",
+    "OX",
+    "Century",
+    "Nexus",
+    "Nature Power",
+    "Navkar",
+    "D-MARC",
+    "Sonik",
+    "Enkor",
+    "Saisho",
+    "Firman",
+    "Power Deluxe",
+    "Itel Safer",
+    "VBT-AX",
+    "APC",
+    "ZVT",
+    "Sollatek",
+    "TBK BIANCO",
+    "Tigmax",
+    "ELEPAQ",
+    "KEMAGE",
+  ];
 
   // Get query parameters
   const categoryParam = searchParams.get("category");
@@ -849,7 +891,7 @@ const allBrands = [
           {/* Breadcrumbs */}
           <div className="mb-6">
             <div className="flex items-center justify-between gap-4">
-              <div className="w-[95%] overflow-x-auto py-3 pr-4 mr-4">
+              <div className="w-[95%] overflow-x-auto py-3 px-4 mr-4">
                 <nav className="flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
                   {breadcrumbs.map((item, index) => (
                     <React.Fragment key={index}>

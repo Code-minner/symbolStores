@@ -1,4 +1,4 @@
-// src/components/ProductCard.tsx - Updated with Wishlist (Width Fix Only)
+// src/components/ProductCard.tsx - Improved with Type Safety
 "use client";
 
 import React, { useState } from "react";
@@ -20,7 +20,7 @@ interface Product {
   warranty?: string;
   imageURL: string;
   images: string[];
-  inStock: boolean;
+  inStock: boolean | string; // ✅ FIXED: Accept both types from database
   slug: string;
   tags?: string[];
 }
@@ -40,6 +40,32 @@ export default function ProductCard({
   const { addToCart, formatPrice, toggleCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
+  // ✅ FIXED: Helper functions for type safety (same as details page)
+  const safeBooleanValue = (value: any): boolean => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true' || value === '1';
+    }
+    return Boolean(value);
+  };
+
+  const safeStringValue = (value: any, fallback: string = ''): string => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'string') return value;
+    return String(value);
+  };
+
+  // ✅ FIXED: Safe property access
+  const isInStock = safeBooleanValue(product.inStock);
+  const productName = safeStringValue(product.itemName, 'Unnamed Product');
+  const productCategory = safeStringValue(product.category, 'unknown');
+  const productSubcategory = safeStringValue(product.subcategory, 'Product');
+  const productBrand = safeStringValue(product.brand, 'Unknown Brand');
+  const productSku = safeStringValue(product.sku, product.id);
+  const productImageURL = safeStringValue(product.imageURL, '/placeholder-image.jpg');
+
+  // ✅ FIXED: Safe wishlist check
   const isWishlisted = isInWishlist(product.id);
 
   const handleQuantityChange = (type: "increase" | "decrease") => {
@@ -51,26 +77,26 @@ export default function ProductCard({
   };
 
   const handleAddToCart = () => {
-    if (!product.inStock) {
+    if (!isInStock) {
       alert("This product is currently out of stock");
       return;
     }
 
-    // Add the specified quantity to cart
+    // ✅ FIXED: Use safe values when adding to cart
     for (let i = 0; i < quantity; i++) {
       addToCart({
         id: product.id,
-        itemName: product.itemName,
-        category: product.category,
-        subcategory: product.subcategory,
-        brand: product.brand,
+        itemName: productName,
+        category: productCategory,
+        subcategory: productSubcategory,
+        brand: productBrand,
         amount: product.amount,
         originalPrice: product.originalPrice,
-        imageURL: product.imageURL,
-        slug: product.slug,
-        inStock: product.inStock,
-        sku: product.sku,
-        warranty: product.warranty,
+        imageURL: productImageURL,
+        slug: safeStringValue(product.slug, product.id),
+        inStock: isInStock,
+        sku: productSku,
+        warranty: safeStringValue(product.warranty),
       });
     }
 
@@ -80,37 +106,41 @@ export default function ProductCard({
   };
 
   const handleWishlistToggle = () => {
+    // ✅ FIXED: Use safe values when adding to wishlist
     toggleWishlist({
       id: product.id,
-      itemName: product.itemName,
-      category: product.category,
-      subcategory: product.subcategory,
-      brand: product.brand,
+      itemName: productName,
+      category: productCategory,
+      subcategory: productSubcategory,
+      brand: productBrand,
       amount: product.amount,
       originalPrice: product.originalPrice,
-      imageURL: product.imageURL,
-      slug: product.slug,
-      inStock: product.inStock,
-      sku: product.sku,
-      warranty: product.warranty,
+      imageURL: productImageURL,
+      slug: safeStringValue(product.slug, product.id),
+      inStock: isInStock,
+      sku: productSku,
+      warranty: safeStringValue(product.warranty),
     });
   };
 
   const getProductUrl = () => {
-    return `/home/${product.category
-      .toLowerCase()
-      .replace(/\s+/g, "-")}/${product.subcategory
-      .toLowerCase()
-      .replace(/\s+/g, "-")}/${product.slug}`;
+    const category = productCategory.toLowerCase().replace(/\s+/g, "-");
+    const subcategory = productSubcategory.toLowerCase().replace(/\s+/g, "-");
+    const slug = safeStringValue(product.slug, product.id);
+
+    return `/home/${category}/${subcategory}/${slug}`;
   };
+
+  // ✅ FIXED: Safe price calculations
+  const hasOriginalPrice = product.originalPrice && product.originalPrice > product.amount;
 
   return (
     <div
       style={{
         boxSizing: "border-box",
         margin: 0,
-        width: "100%", // ✅ ONLY CHANGE: Use full available width
-        minWidth: "100%", // ✅ ONLY CHANGE: Set minimum width for consistency
+        width: "100%",
+        minWidth: "100%",
         maxWidth: "100%",
         height: showAddToCart ? "420px" : "350px",
         backgroundColor: "#fff",
@@ -161,30 +191,33 @@ export default function ProductCard({
               }
             }}
           >
+            {/* ✅ FIXED: Safe image loading with fallback */}
             <Image
-              src={product.imageURL}
-              alt={product.itemName}
+              src={productImageURL}
+              alt={`${productName} - ${productSubcategory}`}
               fill
               className="w-[100%] h-[100%] object-cover"
               style={{
                 objectFit: "cover",
                 transition: "transform 0.3s ease, filter 0.3s ease",
               }}
+              onError={(e) => {
+                // Fallback for broken images
+                const target = e.target as HTMLImageElement;
+                target.src = '/placeholder-image.jpg';
+              }}
             />
           </div>
         </Link>
 
-        {/* Badge */}
-        {(isTopRated ||
-          !product.inStock ||
-          (product.originalPrice &&
-            product.originalPrice > product.amount)) && (
+        {/* ✅ FIXED: Badge logic with safe boolean checks */}
+        {(isTopRated || !isInStock || hasOriginalPrice) && (
           <span
             style={{
               position: "absolute",
               top: "10px",
               left: "10px",
-              backgroundColor: !product.inStock ? "#9CA3AF" : "#EE5858",
+              backgroundColor: !isInStock ? "#9CA3AF" : "#EE5858",
               color: "rgb(255, 255, 255)",
               padding: "4px 8px",
               fontSize: "0.875rem",
@@ -192,9 +225,9 @@ export default function ProductCard({
               borderRadius: "5px",
             }}
           >
-            {!product.inStock
+            {!isInStock
               ? "Out of Stock"
-              : product.originalPrice && product.originalPrice > product.amount
+              : hasOriginalPrice
               ? "Sale"
               : isTopRated
               ? "Top Rated"
@@ -216,7 +249,7 @@ export default function ProductCard({
         <div>
           {/* Category */}
           <span
-          className="text-[0.7rem] sm:text-[0.9rem]"
+            className="text-[0.7rem] sm:text-[0.9rem]"
             style={{
               color: "#EE5858",
               backgroundColor: "#D8262670",
@@ -226,7 +259,7 @@ export default function ProductCard({
               display: "inline-block",
             }}
           >
-            {product.subcategory}
+            {productSubcategory}
           </span>
 
           {/* Title - Fixed Height with Overflow */}
@@ -248,7 +281,7 @@ export default function ProductCard({
               onMouseOver={(e) => (e.currentTarget.style.color = "#EE5858")}
               onMouseOut={(e) => (e.currentTarget.style.color = "inherit")}
             >
-              {product.itemName}
+              {productName}
             </h2>
           </Link>
         </div>
@@ -266,7 +299,7 @@ export default function ProductCard({
           >
             <div>
               <p
-              className="text-[1rem] sm:text-[1.5rem]"
+                className="text-[1rem] sm:text-[1.5rem]"
                 style={{
                   fontWeight: "bold",
                   color: "#1f2937",
@@ -275,20 +308,20 @@ export default function ProductCard({
               >
                 {formatPrice(product.amount)}
               </p>
-              {product.originalPrice &&
-                product.originalPrice > product.amount && (
-                  <p
-                    style={{
-                      fontSize: "0.875rem",
-                      color: "#6B7280",
-                      textDecoration: "line-through",
-                      marginTop: "2px",
-                      margin: 0,
-                    }}
-                  >
-                    {formatPrice(product.originalPrice)}
-                  </p>
-                )}
+              {/* ✅ FIXED: Safe original price display */}
+              {hasOriginalPrice && (
+                <p
+                  style={{
+                    fontSize: "0.875rem",
+                    color: "#6B7280",
+                    textDecoration: "line-through",
+                    marginTop: "2px",
+                    margin: 0,
+                  }}
+                >
+                  {formatPrice(product.originalPrice!)}
+                </p>
+              )}
             </div>
 
             {/* Heart Icon - Updated */}
@@ -306,6 +339,7 @@ export default function ProductCard({
                 (e.currentTarget.style.transform = "scale(1.1)")
               }
               onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
             >
               <svg
                 style={{ width: "20px", height: "20px" }}
@@ -386,38 +420,36 @@ export default function ProductCard({
                 </button>
               </div>
 
-              {/* Add to Cart Button */}
+              {/* ✅ FIXED: Add to Cart Button with safe boolean check */}
               <button
                 onClick={handleAddToCart}
-                disabled={!product.inStock}
-                className="text-[8px]  sm:text-[12px] md:text-13px lg:text-[14px] p-[6px 8px] sm:p-[12px 12px] "
+                disabled={!isInStock}
+                className="text-[8px] sm:text-[12px] md:text-13px lg:text-[14px] p-[6px 8px] sm:p-[12px 12px]"
                 style={{
                   flex: 1,
-                  border: `1px solid ${
-                    product.inStock ? "#FF0000" : "#9CA3AF"
-                  }`,
-                  color: product.inStock ? "#FF0000" : "#9CA3AF",
+                  border: `1px solid ${isInStock ? "#FF0000" : "#9CA3AF"}`,
+                  color: isInStock ? "#FF0000" : "#9CA3AF",
                   fontWeight: "bold",
                   background: "#ffffff",
                   borderRadius: "100px",
-                  cursor: product.inStock ? "pointer" : "not-allowed",
+                  cursor: isInStock ? "pointer" : "not-allowed",
                   transition: "all 0.2s ease",
                   height: "40px",
                 }}
                 onMouseOver={(e) => {
-                  if (product.inStock) {
+                  if (isInStock) {
                     e.currentTarget.style.backgroundColor = "#FF0000";
                     e.currentTarget.style.color = "white";
                   }
                 }}
                 onMouseOut={(e) => {
-                  if (product.inStock) {
+                  if (isInStock) {
                     e.currentTarget.style.backgroundColor = "#ffffff";
                     e.currentTarget.style.color = "#FF0000";
                   }
                 }}
               >
-                {product.inStock ? "ADD TO CART" : "OUT OF STOCK"}
+                {isInStock ? "ADD TO CART" : "OUT OF STOCK"}
               </button>
             </div>
           )}

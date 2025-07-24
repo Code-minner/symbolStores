@@ -11,7 +11,6 @@ import { useCart } from "@/lib/CartContext";
 import { useWishlist } from "@/lib/WishlistContext";
 import clsx from "clsx";
 
-
 // Debounce utility function
 const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout;
@@ -83,7 +82,28 @@ export default function Header() {
     Generator: ["Petrol Generator", "Diesel Generator", "Gas Generator"],
     Freezers: ["Chest Freezer", "Upright Freezer", "Mini Freezer"],
     Microwave: ["Solo Microwave", "Grill Microwave", "Convection Microwave"],
+    Extentions: ["Ac guard"],
+    "Pressing Iron": ["Dry Iron", "Steam Iron"],
+    Stabilizer: [],
     "Air Conditioner": ["Split AC", "Window AC", "Portable AC"],
+    "Washing Machine": [
+      "Front Load Washing Machine",
+      "Top Load Washing Machine",
+      "Automatic Washing Machine",
+      "Wash and Dry",
+      "Commercial Dryer",
+      "Twin Tub Washing Machines",
+      "Tumble Dryer",
+    ],
+    Stove: [
+      "Table Top Gas Cooker",
+      "50x50 Cookers",
+      "60x60 Cookers",
+      "60x90 Cookers",
+      "90x60 Cookers",
+      "Air Fryer",
+    ],
+
     Blender: ["Hand Blender", "Stand Blender", "Smoothie Blender"],
     "Audio Bass": ["Speakers", "Headphones", "Sound Bar"],
     Others: ["Accessories", "Parts", "Tools"],

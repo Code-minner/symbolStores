@@ -132,7 +132,6 @@ export default function ProductGrid() {
       <div className="flex justify-between items-center mt-16 mb-6">
         <h2 className="text-[16px] sm:text-[22px] font-medium text-gray-800 relative">
           Products
-          <span className="text-sm text-gray-500 ml-2">({products.length} items)</span>
         </h2>
         <a
           href="/shop"

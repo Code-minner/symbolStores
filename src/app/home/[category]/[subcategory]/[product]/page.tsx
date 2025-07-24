@@ -52,6 +52,86 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
   const { toggleWishlist, isInWishlist } = wishlistHook;
   const { products, loading: productsLoading } = useProducts();
 
+  // ✅ FIXED: Helper function to clean features - handles mixed string/boolean types
+  const cleanFeatures = (features: (string | boolean)[] | undefined): string[] => {
+    if (!features || !Array.isArray(features)) return [];
+    
+    return features
+      .filter((feature): feature is string => {
+        // Type guard to ensure we have valid strings only
+        return feature !== null && 
+               feature !== undefined &&
+               typeof feature === 'string' && 
+               feature !== 'null' && 
+               feature !== 'undefined' &&
+               feature.trim().length > 3;
+      })
+      .map(feature => {
+        // Decode HTML entities and clean up
+        let cleaned = feature
+          .replace(/&nbsp;/g, ' ')           // Replace &nbsp; with spaces
+          .replace(/&amp;/g, '&')           // Replace &amp; with &
+          .replace(/&lt;/g, '<')            // Replace &lt; with <
+          .replace(/&gt;/g, '>')            // Replace &gt; with >
+          .replace(/\?/g, ':')              // Replace ? with : for better formatting
+          .replace(/\s+/g, ' ')             // Replace multiple spaces with single space
+          .trim();                          // Remove leading/trailing spaces
+        
+        // If it looks like "Key : Value", format it better
+        if (cleaned.includes(':')) {
+          const [key, value] = cleaned.split(':').map(s => s.trim());
+          if (key && value && value !== 'null') {
+            return `${key}: ${value}`;
+          }
+        }
+        
+        return cleaned;
+      })
+      .filter(feature => feature && !feature.includes('null')); // Final cleanup
+  };
+
+  // ✅ FIXED: Helper function to safely convert to boolean with null checking
+  const safeBooleanValue = (value: any): boolean => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true' || value === '1';
+    }
+    return Boolean(value);
+  };
+
+  // ✅ FIXED: Helper function to safely convert description to clean string
+  const safeStringValue = (value: any): string => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'boolean') return value.toString();
+    return String(value);
+  };
+
+  // ✅ FIXED: Helper function to clean description text
+  const cleanDescription = (description: any): string => {
+    const rawDescription = safeStringValue(description);
+    if (!rawDescription || rawDescription.length === 0) return 'No description available.';
+    
+    return rawDescription
+      .replace(/&nbsp;/g, ' ')           // Replace &nbsp; with spaces
+      .replace(/&amp;/g, '&')           // Replace &amp; with &
+      .replace(/&lt;/g, '<')            // Replace &lt; with <
+      .replace(/&gt;/g, '>')            // Replace &gt; with >
+      .replace(/\?&nbsp;/g, ': ')       // Replace "?&nbsp;" with ": "
+      .replace(/\?\s+/g, ': ')          // Replace "? " with ": "
+      .replace(/\s+/g, ' ')             // Replace multiple spaces with single space
+      .trim();                          // Remove leading/trailing spaces
+  };
+
+  // ✅ FIXED: Safe access to product properties with null checking
+  const getProductBooleans = (product: Product | null) => {
+    if (!product) return { isInStock: false };
+    return {
+      isInStock: safeBooleanValue(product.inStock)
+    };
+  };
+
   // Get wishlist status for current product
   const isWishlisted = product ? isInWishlist(product.id) : false;
 
@@ -136,7 +216,13 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
   };
 
   const handleAddToCart = () => {
-    if (!product?.inStock) {
+    // ✅ FIXED: Add null check for product
+    if (!product) {
+      alert("Product not available");
+      return;
+    }
+
+    if (!isInStock) {
       alert("This product is currently out of stock");
       return;
     }
@@ -153,7 +239,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
         originalPrice: product.originalPrice,
         imageURL: product.imageURL,
         slug: product.slug,
-        inStock: product.inStock,
+        inStock: isInStock,
         sku: product.sku,
         warranty: product.warranty,
       });
@@ -169,7 +255,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
     }, 3000);
   };
 
-  // Updated wishlist toggle function
+  // Updated wishlist toggle function with proper null checking
   const handleWishlistToggle = () => {
     if (!product) {
       console.log("No product available");
@@ -190,7 +276,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
         originalPrice: product.originalPrice,
         imageURL: product.imageURL,
         slug: product.slug,
-        inStock: product.inStock,
+        inStock: isInStock,
         sku: product.sku,
         warranty: product.warranty,
       });
@@ -275,6 +361,10 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
     );
   }
 
+  // ✅ Get cleaned features and safe boolean values for this product
+  const cleanedFeatures = product ? cleanFeatures(product.features) : [];
+  const isInStock = product ? safeBooleanValue(product.inStock) : false;
+
   return (
     <div>
       <Header />
@@ -296,7 +386,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            Added {quantity} x {product.itemName} to cart!
+            Added {quantity} x {product?.itemName || 'item'} to cart!
           </div>
         </div>
       )}
@@ -432,7 +522,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
                   </h1>
                   <span
                     className={`inline-block text-sm font-medium px-3 py-1 rounded-full ${
-                      product.inStock
+                      isInStock
                         ? "bg-green-100 text-green-800"
                         : "bg-red-100 text-red-800"
                     }`}
@@ -501,18 +591,18 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
                     Description
                   </h3>
                   <p className="text-gray-700 text-[10px]  sm:text-[14px] leading-relaxed max-h-[150px] overflow-y-auto">
-                    {product.description}
+                    {product ? cleanDescription(product.description) : 'No description available.'}
                   </p>
                 </div>
 
-                {/* Features */}
-                {product.features && product.features.length > 0 && (
+                {/* ✅ FIXED: Features - Using cleaned features */}
+                {cleanedFeatures.length > 0 && (
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-3">
                       Key Features
                     </h3>
                     <ul className="space-y-2">
-                      {product.features.map((feature, index) => (
+                      {cleanedFeatures.map((feature, index) => (
                         <li
                           key={index}
                           className="text-gray-700 text-sm flex items-start"
@@ -554,14 +644,14 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
                     {/* Buy Now Button */}
                     <button
                       onClick={handleAddToCart}
-                      disabled={!product.inStock}
+                      disabled={!isInStock}
                       className={` py-3 px-6 rounded-lg font-semibold transition-colors ${
-                        product.inStock
+                        isInStock
                           ? "bg-[#FF0000] text-white hover:bg-orange-700"
                           : "bg-gray-300 text-gray-500 cursor-not-allowed"
                       }`}
                     >
-                      {product.inStock ? "Add to Cart" : "Out of Stock"}
+                      {isInStock ? "Add to Cart" : "Out of Stock"}
                     </button>
 
                     {/* Wishlist Button - Same as ProductCard */}

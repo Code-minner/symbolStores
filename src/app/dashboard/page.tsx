@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 // TypeScript interfaces
 interface OrderActivity {
@@ -28,6 +32,8 @@ interface Order {
   total: string;
   products: number;
   items: string[];
+  userId: string;
+  createdAt: any;
 }
 
 interface FormData {
@@ -43,7 +49,7 @@ interface FormData {
   confirmPassword: string;
 }
 
-// SVG Icon Components (replacing lucide-react)
+// SVG Icon Components
 interface IconProps {
   size?: number;
   className?: string;
@@ -98,38 +104,38 @@ const X: React.FC<IconProps> = ({ size = 20, className = "" }) => (
   </svg>
 );
 
-const ChevronLeft: React.FC<IconProps> = ({ size = 20, className = "" }) => (
-  <svg width={size} height={size} className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-  </svg>
-);
-
-const ChevronRight: React.FC<IconProps> = ({ size = 20, className = "" }) => (
-  <svg width={size} height={size} className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-  </svg>
-);
-
-// Single dummy order
-const dummyOrder: Order = {
-  id: "#9345710",
-  status: "IN PROGRESS",
-  date: "Dec 30, 2016 07:52",
-  total: "N6,000.00",
-  products: 3,
-  items: ["Samsung 43-inch Smart TV", "LG Bluetooth Soundbar", "Premium HDMI Cable"]
-};
-
 const UserDashboard = () => {
+  // 🔐 FIREBASE AUTHENTICATION HOOKS
+  const { user, userData, loading: authLoading } = useAuth();
+  const router = useRouter();
+  
+  // Check if all enhanced functions are available
+  const authContext = useAuth();
+  const { 
+    signOut, 
+    updateProfile, 
+    changePassword,
+    extendSession,
+    getRemainingTime 
+  } = authContext;
+
+  // Component State
   const [activeTab, setActiveTab] = useState<string>('profile');
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState<boolean>(false);
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [changingPassword, setChangingPassword] = useState<boolean>(false);
+  const [formInitialized, setFormInitialized] = useState<boolean>(false); // 🔧 NEW: Track if form was populated
+  
   const [trackingForm, setTrackingForm] = useState<{orderId: string; billingEmail: string}>({
     orderId: '',
     billingEmail: ''
   });
+  
   const [showPasswords, setShowPasswords] = useState<{current: boolean; new: boolean; confirm: boolean}>({
     current: false,
     new: false,
@@ -137,13 +143,13 @@ const UserDashboard = () => {
   });
 
   const [formData, setFormData] = useState<FormData>({
-    fullName: 'John Doe',
-    username: 'john234',
-    email: 'john1234@gmail.com',
-    phone: '+234-805-555-0118',
+    fullName: '',
+    username: '',
+    email: '',
+    phone: '',
     country: 'Nigeria',
     state: 'Lagos',
-    zipCode: '100001',
+    zipCode: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -157,7 +163,110 @@ const UserDashboard = () => {
     'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'
   ];
 
+  // 🔐 ENHANCED AUTHENTICATION CHECK (same as WishlistPage pattern)
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        // No Firebase Auth user - redirect to login
+        router.push('/auth?redirect=/dashboard');
+        return;
+      }
+      
+      // Check if user document exists after auth loading is complete
+      if (user && userData === null && !authLoading) {
+        // User exists in Auth but no userData - likely deleted from Firestore
+        console.warn('User authenticated but no user document found');
+        router.push('/auth?redirect=/dashboard&message=account_not_found');
+        return;
+      }
+    }
+  }, [user, userData, authLoading, router]);
+
+  // Additional check for URL message parameters
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const message = urlParams.get('message');
+      
+      if (message === 'account_not_found') {
+        alert('Your account was not found. Please sign in again.');
+      } else if (message === 'authentication_required') {
+        alert('Authentication required. Please sign in to access your dashboard.');
+      }
+    }
+  }, []);
+
+  // 📝 FIXED: POPULATE FORM DATA ONLY ONCE (prevents overriding user input)
+  useEffect(() => {
+    // 🔧 Only populate form data ONCE when user and userData first become available
+    if (userData && user && !formInitialized) {
+      console.log('🔍 Initializing form data for the first time...');
+      
+      setFormData(prev => ({
+        ...prev,
+        fullName: userData.fullName || (userData.firstName && userData.lastName ? `${userData.firstName} ${userData.lastName}` : ''),
+        username: userData.username || '',
+        email: user.email || '',
+        phone: userData.phone || '',
+        country: userData.country || 'Nigeria',
+        state: userData.state || 'Lagos',
+        zipCode: userData.zipCode || ''
+      }));
+      
+      setFormInitialized(true); // 🔧 Mark as initialized so it won't override user input later
+      console.log('✅ Form initialized with user data');
+    }
+  }, [userData, user, formInitialized]);
+
+  // 📦 FIXED ORDERS FETCH (no composite index required)
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user) return;
+      
+      setOrdersLoading(true);
+      try {
+        console.log('📦 Fetching orders for user:', user.uid);
+        
+        // 🔧 Simple query - only filter by userId (no orderBy to avoid index requirement)
+        const ordersRef = collection(db, 'orders');
+        const q = query(ordersRef, where('userId', '==', user.uid));
+        
+        const querySnapshot = await getDocs(q);
+        const userOrders: Order[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const orderData = doc.data();
+          userOrders.push({
+            id: doc.id,
+            ...orderData
+          } as Order);
+        });
+        
+        // 🔧 Sort orders by date in JavaScript instead of Firestore
+        userOrders.sort((a, b) => {
+          if (a.createdAt && b.createdAt) {
+            return b.createdAt.toDate() - a.createdAt.toDate();
+          }
+          return 0;
+        });
+        
+        setOrders(userOrders);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setOrders([]);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    if (user && userData) {
+      fetchOrders();
+    }
+  }, [user, userData]);
+
+  // 🔧 FIXED: Handle input changes (this was working before)
   const handleInputChange = (field: keyof FormData, value: string) => {
+    console.log(`🔍 Updating ${field} to:`, value);
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -171,68 +280,131 @@ const UserDashboard = () => {
     }));
   };
 
-  const handleSaveChanges = (): void => {
-    // TODO: Save to Firebase
-    alert('Changes saved successfully!');
+  // 💾 SAVE PROFILE CHANGES TO FIREBASE
+  const handleSaveChanges = async (): Promise<void> => {
+    if (!user || !userData) {
+      alert('User not authenticated');
+      return;
+    }
+
+    // Check if updateProfile function is available
+    if (!updateProfile) {
+      alert('Profile update function not available. Please refresh the page.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateProfile({
+        fullName: formData.fullName,
+        username: formData.username,
+        phone: formData.phone,
+        country: formData.country,
+        state: formData.state,
+        zipCode: formData.zipCode
+      });
+      
+      alert('Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleChangePassword = (): void => {
+  // 🔒 CHANGE PASSWORD IN FIREBASE AUTH
+  const handleChangePassword = async (): Promise<void> => {
     if (formData.newPassword !== formData.confirmPassword) {
       alert('New passwords do not match!');
       return;
     }
+    
     if (formData.newPassword.length < 8) {
       alert('Password must be at least 8 characters long!');
       return;
     }
-    // TODO: Update password in Firebase Auth
-    alert('Password changed successfully!');
+
+    if (!formData.currentPassword) {
+      alert('Please enter your current password');
+      return;
+    }
+
+    // Check if changePassword function is available
+    if (!changePassword) {
+      alert('Change password function not available. Please refresh the page.');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await changePassword(formData.currentPassword, formData.newPassword);
+      
+      // Clear password fields
+      setFormData(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      }));
+      
+      alert('Password changed successfully!');
+    } catch (error: any) {
+      alert(error.message || 'Failed to change password. Please try again.');
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
-  const handleTrackOrder = (): void => {
+  // 🚪 LOGOUT FUNCTION
+  const handleLogout = async () => {
+    if (!signOut) {
+      alert('Logout function not available. Please refresh the page.');
+      return;
+    }
+
+    try {
+      await signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      alert('Failed to log out. Please try again.');
+    }
+  };
+
+  // 📦 TRACK ORDER FUNCTION
+  const handleTrackOrder = async (): Promise<void> => {
     if (!trackingForm.orderId.trim() || !trackingForm.billingEmail.trim()) {
       alert('Please fill in both Order ID and Billing Email');
       return;
     }
     
-    // Mock tracking data - replace with real API call
+    // Check if order exists in user's orders
+    const foundOrder = orders.find(order => 
+      order.id.includes(trackingForm.orderId) && 
+      formData.email.toLowerCase() === trackingForm.billingEmail.toLowerCase()
+    );
+
+    if (!foundOrder) {
+      alert('Order not found. Please check your Order ID and billing email.');
+      return;
+    }
+    
+    // Mock tracking data - replace with real tracking API
     const mockTrackingData: TrackingData = {
-      orderId: "#54903843",
-      products: 3,
-      orderDate: "17 Jan, 2021 at 7:52 PM",
+      orderId: foundOrder.id,
+      products: foundOrder.products,
+      orderDate: foundOrder.date,
       expectedDate: "23 Jan, 2021",
-      total: "₦5,400,108.9",
-      currentStage: 2, // 0: Order Placed, 1: Packaging, 2: On the Road, 3: Delivered
+      total: foundOrder.total,
+      currentStage: foundOrder.status === 'COMPLETED' ? 3 : foundOrder.status === 'IN PROGRESS' ? 2 : 1,
       activities: [
         {
-          message: "Your order has been delivered. Thank you for shopping at Citizent",
-          date: "23 Jan, 2021 at 7:52 PM",
-          type: "delivered"
-        },
-        {
-          message: "Our delivery man (John West) has picked up your order for delivery.",
-          date: "22 Jan, 2021 at 7:06 PM",
-          type: "pickup"
-        },
-        {
-          message: "Your order has reached at last mile hub.",
-          date: "22 Jan, 2021 at 6:55 AM",
-          type: "hub"
-        },
-        {
-          message: "Your order on the way to (last mile) hub.",
-          date: "21 Jan, 2021 at 8:33 AM",
-          type: "transit"
-        },
-        {
-          message: "Your order is successfully verified.",
-          date: "20 Jan, 2021 at 7:23 PM",
-          type: "verified"
-        },
-        {
-          message: "Your order has been confirmed.",
-          date: "19 Jan, 2021 at 8:42 PM",
-          type: "confirmed"
+          message: foundOrder.status === 'COMPLETED' 
+            ? "Your order has been delivered. Thank you for shopping!" 
+            : "Your order is being processed",
+          date: foundOrder.date,
+          type: foundOrder.status === 'COMPLETED' ? "delivered" : "confirmed"
         }
       ]
     };
@@ -263,6 +435,30 @@ const UserDashboard = () => {
     { id: 'order-history', label: 'Order History', icon: Package },
     { id: 'logout', label: 'Log-out', icon: LogOut }
   ];
+
+  // 🔄 LOADING STATE - Show spinner while checking auth (same as WishlistPage)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 🚫 If not authenticated or no user data, don't render anything (will redirect)
+  if (!user || (user && userData === null && !authLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
 
   const OrderDetailsModal = () => {
     if (!showOrderDetails || !selectedOrder) return null;
@@ -306,9 +502,9 @@ const UserDashboard = () => {
             <div className="pt-3 border-t">
               <span className="text-gray-600 block mb-2">Items:</span>
               <ul className="list-disc list-inside space-y-1">
-                {selectedOrder.items.map((item, index) => (
+                {selectedOrder.items?.map((item, index) => (
                   <li key={index} className="text-sm text-gray-700">{item}</li>
-                ))}
+                )) || <li className="text-sm text-gray-500">Order items not available</li>}
               </ul>
             </div>
           </div>
@@ -321,7 +517,17 @@ const UserDashboard = () => {
               Close
             </button>
             {selectedOrder.status === 'IN PROGRESS' && (
-              <button className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+              <button 
+                onClick={() => {
+                  setShowOrderDetails(false);
+                  setActiveTab('track-order');
+                  setTrackingForm({
+                    orderId: selectedOrder.id,
+                    billingEmail: formData.email
+                  });
+                }}
+                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
                 Track Order
               </button>
             )}
@@ -333,7 +539,43 @@ const UserDashboard = () => {
 
   const ProfileTab = () => (
     <div className="bg-white rounded-lg p-6">
-      <h2 className="text-xl font-bold mb-6">ACCOUNT SETTING</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold">ACCOUNT SETTING</h2>
+        
+        {/* Session Status Display */}
+        {getRemainingTime && (() => {
+          const remaining = getRemainingTime();
+          const minutes = Math.floor(remaining / (60 * 1000));
+          const hours = Math.floor(minutes / 60);
+          const displayMinutes = minutes % 60;
+          const showWarning = remaining < 10 * 60 * 1000 && remaining > 0;
+          
+          if (remaining <= 0) return null;
+          
+          return (
+            <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
+              showWarning 
+                ? 'bg-red-100 text-red-700 border border-red-200' 
+                : 'bg-green-100 text-green-700 border border-green-200'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                showWarning ? 'bg-red-500 animate-pulse' : 'bg-green-500'
+              }`}></div>
+              <span>
+                Session: {hours > 0 ? `${hours}h ${displayMinutes}m` : `${minutes}m`}
+              </span>
+              {showWarning && extendSession && (
+                <button
+                  onClick={extendSession}
+                  className="ml-1 px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
+                >
+                  Extend
+                </button>
+              )}
+            </div>
+          );
+        })()}
+      </div>
       
       <div className="space-y-8">
         {/* Profile Picture & Basic Info */}
@@ -341,7 +583,15 @@ const UserDashboard = () => {
           {/* Profile Picture */}
           <div className="flex-shrink-0">
             <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center">
-              <User size={40} className="text-white" />
+              {userData?.profilePicture ? (
+                <img 
+                  src={userData.profilePicture} 
+                  alt="Profile" 
+                  className="w-24 h-24 rounded-full object-cover"
+                />
+              ) : (
+                <User size={40} className="text-white" />
+              )}
             </div>
           </div>
           
@@ -354,6 +604,7 @@ const UserDashboard = () => {
                 value={formData.fullName}
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="Enter your full name"
               />
             </div>
             
@@ -364,6 +615,7 @@ const UserDashboard = () => {
                 value={formData.username}
                 onChange={(e) => handleInputChange('username', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="Enter your username"
               />
             </div>
             
@@ -372,8 +624,9 @@ const UserDashboard = () => {
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                title="Email cannot be changed"
               />
             </div>
             
@@ -384,6 +637,7 @@ const UserDashboard = () => {
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="Enter your phone number"
               />
             </div>
             
@@ -398,40 +652,40 @@ const UserDashboard = () => {
               </select>
             </div>
 
-
             <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">States</label>
-              <select
-                value={formData.state}
-                onChange={(e) => handleInputChange('state', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                {nigerianStates.map((state) => (
-                  <option key={state} value={state}>{state}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="md:col-start-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Zip Code</label>
-              <input
-                type="text"
-                value={formData.zipCode}
-                onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                <select
+                  value={formData.state}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                >
+                  {nigerianStates.map((state) => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Zip Code</label>
+                <input
+                  type="text"
+                  value={formData.zipCode}
+                  onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  placeholder="Enter zip code"
+                />
+              </div>
             </div>
           </div>
-        </div>
-
         </div>
         
         <button
           onClick={handleSaveChanges}
-          className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium"
+          disabled={saving || !updateProfile}
+          className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          SAVE CHANGES
+          {saving ? 'SAVING...' : 'SAVE CHANGES'}
         </button>
         
         {/* Change Password Section */}
@@ -499,9 +753,10 @@ const UserDashboard = () => {
             
             <button
               onClick={handleChangePassword}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium"
+              disabled={changingPassword || !changePassword}
+              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              CHANGE PASSWORD
+              {changingPassword ? 'CHANGING...' : 'CHANGE PASSWORD'}
             </button>
           </div>
         </div>
@@ -665,39 +920,54 @@ const UserDashboard = () => {
         <h2 className="text-xl font-semibold">Order History</h2>
       </div>
       
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left py-3 px-6 font-medium text-gray-700">ORDER ID</th>
-              <th className="text-left py-3 px-6 font-medium text-gray-700">STATUS</th>
-              <th className="text-left py-3 px-6 font-medium text-gray-700">DATE</th>
-              <th className="text-left py-3 px-6 font-medium text-gray-700">TOTAL</th>
-              <th className="text-left py-3 px-6 font-medium text-gray-700">ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="py-4 px-6 font-medium text-gray-900">{dummyOrder.id}</td>
-              <td className="py-4 px-6">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(dummyOrder.status)}`}>
-                  {dummyOrder.status}
-                </span>
-              </td>
-              <td className="py-4 px-6 text-gray-600">{dummyOrder.date}</td>
-              <td className="py-4 px-6 font-medium">{dummyOrder.total} ({dummyOrder.products} Products)</td>
-              <td className="py-4 px-6">
-                <button
-                  onClick={() => handleViewDetails(dummyOrder)}
-                  className="flex items-center gap-1 text-orange-500 hover:text-orange-600 font-medium transition-colors"
-                >
-                  View Details <Eye size={16} />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      {ordersLoading ? (
+        <div className="p-6 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading orders...</p>
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="p-6 text-center">
+          <Package size={48} className="mx-auto text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Orders Yet</h3>
+          <p className="text-gray-500">You haven't placed any orders yet. Start shopping to see your order history here!</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left py-3 px-6 font-medium text-gray-700">ORDER ID</th>
+                <th className="text-left py-3 px-6 font-medium text-gray-700">STATUS</th>
+                <th className="text-left py-3 px-6 font-medium text-gray-700">DATE</th>
+                <th className="text-left py-3 px-6 font-medium text-gray-700">TOTAL</th>
+                <th className="text-left py-3 px-6 font-medium text-gray-700">ACTION</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-4 px-6 font-medium text-gray-900">#{order.id.substring(0, 8)}</td>
+                  <td className="py-4 px-6">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-gray-600">{order.date}</td>
+                  <td className="py-4 px-6 font-medium">{order.total} ({order.products} Products)</td>
+                  <td className="py-4 px-6">
+                    <button
+                      onClick={() => handleViewDetails(order)}
+                      className="flex items-center gap-1 text-orange-500 hover:text-orange-600 font-medium transition-colors"
+                    >
+                      View Details <Eye size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 
@@ -716,8 +986,7 @@ const UserDashboard = () => {
                     key={id}
                     onClick={() => {
                       if (id === 'logout') {
-                        // Handle logout
-                        alert('Logging out...');
+                        handleLogout();
                       } else {
                         setActiveTab(id);
                       }
@@ -764,7 +1033,7 @@ const UserDashboard = () => {
                         key={id}
                         onClick={() => {
                           if (id === 'logout') {
-                            alert('Logging out...');
+                            handleLogout();
                           } else {
                             setActiveTab(id);
                           }

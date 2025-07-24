@@ -1,6 +1,6 @@
-// lib/firebase.ts
+// lib/firebase.ts - Enhanced version of your original
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserSessionPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 // Removed getStorage import since we're using Cloudinary
 
@@ -18,3 +18,19 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 // Removed storage export since we're using Cloudinary
+
+// 🔧 Configure session persistence for enhanced security
+// This makes sessions end when browser closes, working with our custom timeout
+export const configureSessionPersistence = async () => {
+  try {
+    await setPersistence(auth, browserSessionPersistence);
+    console.log('Firebase Auth configured for session-only persistence');
+  } catch (error) {
+    console.error('Error configuring Firebase Auth persistence:', error);
+  }
+};
+
+// 🚀 Call this in your app initialization (optional but recommended)
+if (typeof window !== 'undefined') {
+  configureSessionPersistence();
+}

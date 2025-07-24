@@ -10,7 +10,7 @@ import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
 import CustomHeroCarousel from "@/components/HeroCarousel";
 import { useEffect, useState } from "react";
- import { getAllProducts } from '@/lib/ProductsCache';
+import { getAllProducts } from "@/lib/ProductsCache";
 
 // Define the Brand interface
 interface Brand {
@@ -93,21 +93,17 @@ export default function Home() {
   // ✅ FIXED: Properly type the products state
   const [products, setProducts] = useState<Product[]>([]);
 
-useEffect(() => {
-  const load = async () => {
-    try {
-      const data = await getAllProducts();
-      setProducts(data);
-    } catch (error) {
-      console.error('Error loading products:', error);
-    }
-  };
-  load();
-}, []);
-
- 
-
-
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await getAllProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error loading products:", error);
+      }
+    };
+    load();
+  }, []);
 
   return (
     <div className="flex flex-col w-full">
@@ -327,6 +323,8 @@ useEffect(() => {
           </div>
         </div>
         <div>
+          {/* Hot Deals Section */}
+
           <div className="flex justify-between items-center mt-16 mb-6">
             <h2 className="text-[16px] sm:text-[22px] font-medium text-gray-800 relative">
               Hot Deals
@@ -344,15 +342,57 @@ useEffect(() => {
             <span className="absolute left-[0%] top-[40%] block w-[100%] h-0.5 bg-gray-100 mb-1 rounded-full"></span>
           </div>
 
-          <div className="grid grid-cols-[100%] md:grid-cols-[60%_40%] gap-4 py-8 mt-16">
+          <div className="grid grid-cols-[100%] md:grid-cols-[65%_35%] gap-4 py-8 mt-16">
             <div>
-              <div className="flex justify-between items-center mt-4 mb-6">
+              {/* mobile view */}
+
+              <div className="grid grid-cols-[50%_50%] gap-4 block sm:hidden ">
+                <div>
+                  <div className="flex justify-between items-center mt-4">
+                    <div className="relative w-full h-[150px]">
+                      <Image
+                        src="/assets/image 14.png"
+                        alt="Deals of the Day"
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                    <div className="relative w-full h-[150px]">
+                      <Image
+                        src="/assets/image 15.png"
+                        alt="Deals of the Day"
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                  </div>
+                  <div className="relative w-[100%] h-[150px] sm:h-[30vh]">
+                    <Image
+                      src="/assets/image 13.png"
+                      alt="Deals of the Day"
+                      fill
+                      className="object-cover object-top"
+                    />
+                  </div>
+                </div>
+                <div className="relative w-full h-[350px]  mb-4">
+                  <Image
+                    src="/assets/image 15.png"
+                    alt="Deals of the Day"
+                    fill
+                    className="object-scale"
+                  />
+                </div>
+              </div>
+
+              {/* desktop view */}
+              <div className="hidden sm:flex justify-between items-center mt-4 mb-6">
                 <div className="relative w-full h-[200px] sm:h-[30vh] mb-4">
                   <Image
                     src="/assets/image 14.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-contain"
+                    className="object-scale"
                   />
                 </div>
                 <div className="relative w-full h-[200px] sm:h-[30vh] mb-4">
@@ -360,7 +400,7 @@ useEffect(() => {
                     src="/assets/image 15.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-contain"
+                    className="object-scale object-top"
                   />
                 </div>
 
@@ -369,31 +409,40 @@ useEffect(() => {
                     src="/assets/image 13.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-contain"
+                    className="object-scale"
                   />
                 </div>
               </div>
 
               <div className="bg-gray-100 p-8 rounded-[30px]">
-                <h2 className="w-full max-w-[90%] text-[16px] sm:text-[22px] leading-snug font-medium text-gray-800 mb-4">
+                <h2 className="w-full sm:max-w-[90%] text-[14px] sm:text-[22px] leading-snug font-medium text-gray-800 mb-4">
                   Hisense H670SMIB-WD 514L Black Glass (Side By Side)
                   Refrigerator With Door Opening Alarm
                 </h2>
 
-                <ul>
-                  <li>
-                    Feature Specification Capacity - 514 L (335 L fridge / 177 L
-                    freezer)
-                  </li>
-                  <li>Energy Efficiency - A+, ~412 kWh/year</li>
-                  <li>Cooling - Frost‑free, Multi‑Air Flow</li>
-                  <li>Modes - Super‑Cool, Super‑Freeze, Holiday, etc.</li>
-                  <li>Water / Ice Feature - 2L reservoir, twist ice maker</li>
-                  <li>Alarm - Door‑opening alarm</li>
-                  <li>Dimensions - 910×641×1780 mm</li>
-                  <li>Noise Level - ≤ 43 dB</li>
-                  <li>Warranty - 36–48 month</li>
-                </ul>
+                <div className="flex flex-col sm:flex-row gap-2 justify-between sm:items-end">
+                  <ul className="text-[10px] sm:text-[14px]">
+                    <li>
+                      Feature Specification Capacity - 514 L (335 L fridge / 177
+                      L freezer)
+                    </li>
+                    <li>Energy Efficiency - A+, ~412 kWh/year</li>
+                    <li>Cooling - Frost‑free, Multi‑Air Flow</li>
+                    <li>Modes - Super‑Cool, Super‑Freeze, Holiday, etc.</li>
+                    <li>Water / Ice Feature - 2L reservoir, twist ice maker</li>
+                    <li>Alarm - Door‑opening alarm</li>
+                    <li>Dimensions - 910×641×1780 mm</li>
+                    <li>Noise Level - ≤ 43 dB</li>
+                    <li>Warranty - 36–48 month</li>
+                  </ul>
+
+                  <div>
+                    <h2 className="text-[18px] mb-4">₦ 1,140,000</h2>
+                    <button className="bg-[#FF0000] text-[14px] px-4 py-2 border-2 border-[#FF0000] text-[#fff]  rounded-lg shadow hover:bg-[#FF0000] hover:text-white transition">
+                      View More
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
