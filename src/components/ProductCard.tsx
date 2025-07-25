@@ -142,7 +142,7 @@ export default function ProductCard({
         width: "100%",
         minWidth: "100%",
         maxWidth: "100%",
-        height: showAddToCart ? "420px" : "350px",
+        height: "100%",
         backgroundColor: "#fff",
         padding: "10px",
         border: "1px solid #E4E7E9",
@@ -249,7 +249,7 @@ export default function ProductCard({
         <div>
           {/* Category */}
           <span
-            className="text-[0.7rem] sm:text-[0.9rem]"
+            className="text-[0.6rem] sm:text-[0.9rem]"
             style={{
               color: "#EE5858",
               backgroundColor: "#D8262670",
@@ -434,7 +434,7 @@ export default function ProductCard({
                   borderRadius: "100px",
                   cursor: isInStock ? "pointer" : "not-allowed",
                   transition: "all 0.2s ease",
-                  height: "40px",
+                  height: "100%",
                 }}
                 onMouseOver={(e) => {
                   if (isInStock) {

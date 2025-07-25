@@ -400,7 +400,7 @@ export default function Header() {
               className="flex items-center gap-[8px] hover:text-red-500 cursor-pointer transition-colors"
             >
               <div className="relative">
-                <Icon icon="icon-park-outline:like" className="w-6 h-6" />
+                <Icon icon="icon-park-outline:like" className="w-6 h-6 text-black" />
                 {wishlistCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                     {wishlistCount > 99 ? "99+" : wishlistCount}
@@ -418,8 +418,8 @@ export default function Header() {
             >
               <div className="relative">
                 <svg
-                  width="15"
-                  height="17"
+                  width="17"
+                  height="15"
                   viewBox="0 0 50 51"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -443,7 +443,7 @@ export default function Header() {
               href="/dashboard"
               className="flex items-center gap-[8px] hover:text-red-500 cursor-pointer transition-colors"
             >
-              <Icon icon="ph:user-bold" className="w-6 h-6" />
+              <Icon icon="ph:user-bold" className="w-6 h-6 text-black" />
               <span className="head_span hidden lg:inline">Account</span>
             </Link>
           </div>
@@ -480,12 +480,12 @@ export default function Header() {
             <div className="flex-1 max-w-[85%] mx-4 relative">
               <form
                 onSubmit={handleSearch}
-                className="flex items-center border border-gray-300 rounded-full overflow-hidden h-12"
+                className="flex items-center border border-gray-300 rounded-full overflow-hidden h-10"
               >
                 <div className="flex items-center px-3 bg-white text-gray-500">
                   <svg
-                    width="16"
-                    height="16"
+                    width="14"
+                    height="14"
                     viewBox="0 0 19 19"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"

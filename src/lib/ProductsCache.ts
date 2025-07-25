@@ -1,6 +1,6 @@
-// src/lib/ProductsCache.ts - OPTIMIZED FOR MINIMAL FIREBASE READS
+// src/lib/ProductsCache.ts - Complete Fixed Version (Only Images Compression Fixed)
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 
 export interface Product {
   id: string;
@@ -44,7 +44,58 @@ let performanceStats = {
   cacheSavingsPercent: 0
 };
 
-// 🗜️ LIGHTWEIGHT COMPRESSION (keeps reliability, saves space)
+// ✅ SAME - Safe timestamp handling
+function safeTimestampToDate(timestamp: any): Date {
+  if (!timestamp) return new Date();
+  
+  // If it's already a Date object
+  if (timestamp instanceof Date) return timestamp;
+  
+  // If it's a Firestore Timestamp with toDate method
+  if (timestamp && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  
+  // If it's a Firestore Timestamp-like object with seconds/nanoseconds
+  if (timestamp && typeof timestamp.seconds === 'number') {
+    return new Date(timestamp.seconds * 1000);
+  }
+  
+  // If it's a plain object with _seconds (from JSON serialization)
+  if (timestamp && typeof timestamp._seconds === 'number') {
+    return new Date(timestamp._seconds * 1000);
+  }
+  
+  // If it's a string or number, try to parse it
+  if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? new Date() : date;
+  }
+  
+  // Fallback to current date
+  return new Date();
+}
+
+// ✅ SAME - Convert timestamps to milliseconds for storage
+function serializeTimestamp(timestamp: any): number {
+  const date = safeTimestampToDate(timestamp);
+  return date.getTime(); // Store as milliseconds since epoch
+}
+
+// ✅ SAME - Recreate Firestore Timestamp from milliseconds
+function deserializeTimestamp(milliseconds: number): any {
+  // Create a Timestamp-like object with toDate method
+  const date = new Date(milliseconds);
+  return {
+    _seconds: Math.floor(milliseconds / 1000),
+    _nanoseconds: (milliseconds % 1000) * 1000000,
+    toDate: () => date,
+    seconds: Math.floor(milliseconds / 1000),
+    nanoseconds: (milliseconds % 1000) * 1000000
+  };
+}
+
+// ✅ FIXED - Proper timestamp compression (keeps ALL images now)
 function compressForStorage(products: Product[]) {
   return products.map(p => ({
     i: p.id,
@@ -60,13 +111,15 @@ function compressForStorage(products: Product[]) {
     sk: p.sku,
     w: p.warranty || '',
     img: p.imageURL,
+    imgs: p.images || [p.imageURL], // ✅ FIXED: Keep ALL images array
     ins: p.inStock,
     sl: p.slug,
-    cr: p.createdAt,
+    cr: serializeTimestamp(p.createdAt), // ✅ Convert to milliseconds
     t: p.tags?.slice(0, 2) || [] // Keep top 2 tags
   }));
 }
 
+// ✅ FIXED - Proper timestamp expansion (restores ALL images now)
 function expandFromStorage(compressed: any[]): Product[] {
   return compressed.map(c => ({
     id: c.i,
@@ -82,10 +135,10 @@ function expandFromStorage(compressed: any[]): Product[] {
     sku: c.sk,
     warranty: c.w,
     imageURL: c.img,
-    images: [c.img], // Use main image
+    images: c.imgs || [c.img], // ✅ FIXED: Restore ALL images from the imgs field
     inStock: c.ins,
     slug: c.sl,
-    createdAt: c.cr,
+    createdAt: deserializeTimestamp(c.cr), // ✅ Recreate Timestamp with toDate method
     tags: c.t
   }));
 }
@@ -366,14 +419,13 @@ export async function getRandomizedProducts(limit?: number): Promise<Product[]> 
 
 // 📊 PERFORMANCE MONITORING
 export function getPerformanceStats() {
-  // ✅ FIXED: Changed variable name to match the property name being used
   const minutesSinceLastFirebaseQuery = performanceStats.lastFirebaseQuery > 0 ? 
     Math.round((Date.now() - performanceStats.lastFirebaseQuery) / 1000 / 60) : 0;
 
   return {
     ...performanceStats,
     cacheAge: memoryCache ? Math.round((Date.now() - cacheTimestamp) / 1000 / 60) + ' minutes' : 'No cache',
-    minutesSinceLastFirebaseQuery, // ✅ Now matches the variable name
+    minutesSinceLastFirebaseQuery,
     estimatedReadsSaved: performanceStats.totalRequests - performanceStats.firebaseReads,
     nextRefreshIn: memoryCache ? 
       Math.max(0, Math.round((CACHE_DURATION - (Date.now() - cacheTimestamp)) / 1000 / 60)) + ' min' : 'Now'
@@ -409,3 +461,10 @@ export const forceRefreshProducts = async (): Promise<Product[]> => {
 };
 
 export const getCacheStats = getPerformanceStats;
+
+// ✅ NEW UTILITY - Clear cache to refresh images
+export function fixImagesCache(): void {
+  console.log('🔧 Clearing cache to fix images...');
+  clearProductsCache();
+  console.log('✅ Cache cleared - next load will include all images');
+}

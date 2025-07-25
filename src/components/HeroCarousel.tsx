@@ -58,12 +58,12 @@ const HeroCarousel = () => {
                   // Tablet: 2 slides (add spacing back)
                   768: {
                     slidesPerView: 2,
-                    spaceBetween: 8,
+                    spaceBetween: 0,
                   },
                   // Desktop: 3 slides (add spacing back)
                   1024: {
                     slidesPerView: 3,
-                    spaceBetween: 12,
+                    spaceBetween: 0,
                   },
                 }}
                 pagination={{ 
@@ -90,8 +90,8 @@ const HeroCarousel = () => {
                 {slides.map((slide) => (
                   <SwiperSlide key={slide.id}>
                     {/* ✅ FIXED: Better centering for image container */}
-                    <div className="w-full h-full flex justify-center items-center px-1">
-                      <div className="w-full max-w-[300px] sm:max-w-[340px] lg:max-w-[360px] bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col relative">
+                    <div className="w-full h-full flex justify-between items-center px-1">
+                      <div className="w-full max-w-[100%] sm:max-w-[100%] lg:max-w-[90%] bg-gray-100 rounded-[20px] shadow-lg overflow-hidden mb-8 py-16  flex flex-col relative">
                         {/* Image Section - ✅ FIXED: Better image positioning */}
                         <div className="relative w-full h-[180px] sm:h-[220px] lg:h-[260px] bg-gray-100 overflow-hidden flex items-center justify-center">
                           <Image
@@ -105,7 +105,7 @@ const HeroCarousel = () => {
                         </div>
 
                         {/* Bottom Bar with Button */}
-                        <div className="w-full  backdrop-blur-sm px-4 py-3 flex justify-end absolute bottom-[10px] left-0">
+                        <div className="w-[90%]  backdrop-blur-sm px-4 py-3 flex border border-gray-200 justify-end absolute rounded-[10px]  bottom-[25px] right-[15px] ">
                           <button 
                             className="bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-[4px] transition-colors duration-200 whitespace-nowrap"
                             onClick={() => {

@@ -102,7 +102,7 @@ export default function CartPage() {
 
           {/* Page Header */}
           <div className="flex items-center justify-between mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <h1 className="text-1xl sm:text-3xl font-bold text-gray-900">
               Shopping Cart ({state.totalItems} items)
             </h1>
             {state.items.length > 0 && (
@@ -157,11 +157,11 @@ export default function CartPage() {
                       Cart Items
                     </h2>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {state.items.map((item, index) => (
                         <div
                           key={item.id}
-                          className={`flex gap-4 ${
+                          className={`flex gap-2 sm:gap-4 ${
                             index !== state.items.length - 1
                               ? "border-b border-gray-200 pb-6"
                               : ""
@@ -182,7 +182,7 @@ export default function CartPage() {
                           <div className="flex-1 min-w-0">
                             <Link
                               href={getProductUrl(item)}
-                              className="text-sm sm:text-lg font-medium text-gray-900 hover:text-red-600 transition-colors block"
+                              className="text-[9px] sm:text-lg font-medium text-gray-900 hover:text-red-600 transition-colors block"
                             >
                               {item.itemName}
                             </Link>

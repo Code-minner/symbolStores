@@ -1,7 +1,7 @@
-// contexts/AuthContext.tsx - Enhanced version of your original
+// contexts/AuthContext.tsx - Enhanced version with fixed activity detection
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -67,7 +67,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // 🕐 SESSION TIMEOUT CONFIGURATION
   const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
   const WARNING_TIME = 5 * 60 * 1000; // Show warning 5 minutes before timeout
+  const ACTIVITY_THROTTLE = 60 * 1000; // Only refresh session every 60 seconds
   
+  // 🔧 FIXED: Use useRef for immediate access, state for UI updates
+  const lastActivityRef = useRef<number>(Date.now());
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null);
   const [warningTimer, setWarningTimer] = useState<NodeJS.Timeout | null>(null);
@@ -75,8 +78,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // 🔄 Update last activity time
   const updateActivity = () => {
-    setLastActivity(Date.now());
-    console.log('Activity detected - session refreshed');
+    const now = Date.now();
+    lastActivityRef.current = now;
+    setLastActivity(now);
+    // 🔧 FIXED: Only log occasionally to reduce console spam
+    if (Math.random() < 0.1) { // Only log 10% of the time
+      console.log('Activity detected - session refreshed');
+    }
   };
 
   // 🔄 Extend session manually
@@ -89,7 +97,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // 📊 Get remaining session time
   const getRemainingTime = () => {
     if (!user) return 0;
-    const elapsed = Date.now() - lastActivity;
+    const elapsed = Date.now() - lastActivityRef.current; // Use ref for immediate access
     const remaining = SESSION_TIMEOUT - elapsed;
     return Math.max(0, remaining);
   };
@@ -158,7 +166,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, SESSION_TIMEOUT - WARNING_TIME);
     setWarningTimer(warnTimer);
 
-    console.log(`Session timers set: ${SESSION_TIMEOUT / 1000 / 60} minutes until timeout`);
+    // 🔧 FIXED: Only log timer setup occasionally
+    if (Math.random() < 0.2) { // Only log 20% of the time
+      console.log(`Session timers set: ${SESSION_TIMEOUT / 1000 / 60} minutes until timeout`);
+    }
   };
 
   // 🎯 Reset timers on activity
@@ -176,10 +187,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       'touchstart', 'click', 'keydown', 'focus'
     ];
     
+    // 🔧 FIXED: Proper throttling using useRef for immediate access
     const handleActivity = () => {
-      // Throttle activity updates to avoid too many timer resets
       const now = Date.now();
-      if (now - lastActivity > 30000) { // Only reset if 30+ seconds since last activity
+      // Use ref for immediate access to last activity time
+      if (now - lastActivityRef.current > ACTIVITY_THROTTLE) {
         resetTimers();
       }
     };
@@ -353,7 +365,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // 🔍 Debug: Log session status every minute (remove in production)
+  // 🔍 Debug: Log session status every 5 minutes (reduced frequency)
   useEffect(() => {
     if (!user) return;
 
@@ -362,7 +374,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const minutes = Math.floor(remaining / (60 * 1000));
       const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
       console.log(`Session remaining: ${minutes}m ${seconds}s`);
-    }, 60000); // Log every minute
+    }, 5 * 60 * 1000); // Log every 5 minutes instead of 1 minute
 
     return () => clearInterval(debugInterval);
   }, [user, lastActivity]);

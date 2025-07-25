@@ -51,19 +51,33 @@ export default function WishlistPage() {
 
   const [quantities, setQuantities] = useState<{ [key: string]: number }>({});
 
+  // 🔐 ENHANCED AUTHENTICATION CHECK (FIXED VERSION)
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/auth?redirect=/wishlist");
-        return;
-      }
-
-      if (user && userData === null && !authLoading) {
-        console.warn("User authenticated but no user document found");
-        router.push("/auth?redirect=/wishlist&message=account_not_found");
-        return;
-      }
+    if (!authLoading && !user) {
+      router.push("/auth?redirect=/dashboard");
+      return;
     }
+
+    // if (!authLoading) {
+    //   if (!user) {
+    //     // No Firebase Auth user - redirect to login
+    //     router.push("/auth?redirect=/dashboard");
+    //     return;
+    //   }
+
+    //   // Give userData some time to load after user authentication
+    //   if (user && userData === null) {
+    //     const timeoutId = setTimeout(() => {
+    //       // Only redirect if userData is still null after 3 seconds
+    //       if (userData === null) {
+    //         console.warn("User authenticated but no user document found");
+    //         router.push("/auth?redirect=/dashboard&message=account_not_found");
+    //       }
+    //     }, 3000); // Wait 3 seconds for userData to load
+
+    //     return () => clearTimeout(timeoutId);
+    //   }
+    // }
   }, [user, userData, authLoading, router]);
 
   useEffect(() => {
@@ -168,9 +182,7 @@ export default function WishlistPage() {
     const subcategory = item.subcategory || "unknown";
     const slug = item.slug || item.id;
 
-    return `/home/${category
-      .toLowerCase()
-      .replace(/\s+/g, "-")}/${subcategory
+    return `/home/${category.toLowerCase().replace(/\s+/g, "-")}/${subcategory
       .toLowerCase()
       .replace(/\s+/g, "-")}/${slug}`;
   };
@@ -195,7 +207,7 @@ export default function WishlistPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Redirecting to login...</p>
+          <p className="mt-4 px-2 text-gray-600">Redirecting to login...</p>
         </div>
       </div>
     );
@@ -350,29 +362,36 @@ export default function WishlistPage() {
             </nav>
           </div>
 
-          <div className="flex justify-between items-center mb-8 mt-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Wishlist ({wishlistItems.length})
-              </h1>
+          <div className=" mb-8 mt-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl  sm:text-3xl font-bold text-gray-900">
+                  Wishlist ({wishlistItems.length})
+                </h1>
+              </div>
+
+              {wishlistItems.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (
+                      confirm(
+                        "Are you sure you want to clear your entire wishlist?"
+                      )
+                    ) {
+                      await clearWishlist();
+                    }
+                  }}
+                  className="text-red-500 hover:text-red-700 font-medium transition-colors"
+                >
+                  Clear All
+                </button>
+              )}
             </div>
 
-            {wishlistItems.length > 0 && (
-              <button
-                onClick={async () => {
-                  if (
-                    confirm(
-                      "Are you sure you want to clear your entire wishlist?"
-                    )
-                  ) {
-                    await clearWishlist();
-                  }
-                }}
-                className="text-red-500 hover:text-red-700 font-medium transition-colors"
-              >
-                Clear All
-              </button>
-            )}
+            <div className="relative mb-6">
+              <span className="relative z-10 block w-[25%] h-1 mt-1 bg-[#008ECC] rounded-full"></span>
+              <span className="absolute left-[0%] top-[40%] block w-[100%] h-0.5 bg-gray-100 mb-1 rounded-full"></span>
+            </div>
           </div>
 
           {/* ✅ FIXED: Added proper spacing between cards */}
@@ -383,8 +402,10 @@ export default function WishlistPage() {
                 style={{
                   boxSizing: "border-box",
                   margin: 0,
-                  width: "280px",
-                  height: "420px",
+                  width: "100%",
+                  minWidth: "100%",
+                  maxWidth: "100%",
+                  height: "100%",
                   backgroundColor: "#fff",
                   padding: "10px",
                   border: "1px solid #E4E7E9",
@@ -436,7 +457,7 @@ export default function WishlistPage() {
                         src={item.imageURL}
                         alt={item.itemName}
                         fill
-                        sizes="280px"
+                        sizes="200px"
                         style={{
                           objectFit: "cover",
                           transition: "transform 0.3s ease, filter 0.3s ease",
@@ -529,8 +550,8 @@ export default function WishlistPage() {
                 >
                   <div>
                     <span
+                      className="text-[0.6rem] sm:text-[0.9rem]"
                       style={{
-                        fontSize: "0.875rem",
                         color: "#EE5858",
                         backgroundColor: "#D8262670",
                         borderRadius: "100px",
@@ -580,8 +601,8 @@ export default function WishlistPage() {
                     >
                       <div>
                         <p
+                          className="text-[1rem] sm:text-[1.5rem]"
                           style={{
-                            fontSize: "1.5rem",
                             fontWeight: "bold",
                             color: "#1f2937",
                             margin: 0,
@@ -640,7 +661,7 @@ export default function WishlistPage() {
                           }
                           disabled={(quantities[item.id] || 1) <= 1}
                           style={{
-                            padding: "2.5px 6px",
+                            padding: "2.5px 3px",
                             fontSize: "1.125rem",
                             fontWeight: "bold",
                             background: "none",
@@ -657,7 +678,7 @@ export default function WishlistPage() {
                         </button>
                         <span
                           style={{
-                            padding: "3px 6px",
+                            padding: "2.5px 5px",
                             border: "2px solid #FF0000",
                             margin: "0 2px",
                             textAlign: "center",
@@ -672,7 +693,7 @@ export default function WishlistPage() {
                             handleQuantityChange(item.id, "increase")
                           }
                           style={{
-                            padding: "2.5px 6px",
+                            padding: "2.5px 3px",
                             fontSize: "1.125rem",
                             fontWeight: "bold",
                             background: "none",
@@ -688,9 +709,9 @@ export default function WishlistPage() {
                       <button
                         onClick={() => handleAddToCart(item)}
                         disabled={!item.inStock}
+                        className="text-[8px] sm:text-[12px] md:text-13px lg:text-[14px] p-[6px 8px] sm:p-[12px 12px]"
                         style={{
                           flex: 1,
-                          padding: "12px",
                           border: `1px solid ${
                             item.inStock ? "#FF0000" : "#9CA3AF"
                           }`,
@@ -700,8 +721,7 @@ export default function WishlistPage() {
                           borderRadius: "100px",
                           cursor: item.inStock ? "pointer" : "not-allowed",
                           transition: "all 0.2s ease",
-                          fontSize: "0.7rem",
-                          height: "40px",
+                          height: "100%",
                         }}
                         onMouseOver={(e) => {
                           if (item.inStock) {
@@ -775,14 +795,12 @@ export default function WishlistPage() {
             </div>
           )}
         </div>
-        
+
         {/* ✅ FIXED: Filter products to only pass valid ones to ProductSlider */}
-        <ProductSlider 
-          products={products.filter(product => 
-            product.category && 
-            product.subcategory && 
-            product.slug
-          )} 
+        <ProductSlider
+          products={products.filter(
+            (product) => product.category && product.subcategory && product.slug
+          )}
         />
       </div>
 

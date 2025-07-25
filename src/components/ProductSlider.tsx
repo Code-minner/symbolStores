@@ -44,7 +44,7 @@ export default function ProductSlider({ products }: { products: Product[] }) {
           </div>
 
           <div className="relative mb-6">
-            <span className="relative z-10 block w-[20%] h-1 mt-1 bg-blue-400 rounded-full"></span>
+            <span className="relative z-10 block w-[25%] h-1 mt-1 bg-blue-400 rounded-full"></span>
             <span className="absolute left-[0%] top-[40%] block w-[100%] h-0.5 bg-gray-100 mb-1 rounded-full"></span>
           </div>
 
@@ -65,7 +65,7 @@ export default function ProductSlider({ products }: { products: Product[] }) {
           }}
         >
           {products.map((product) => (
-            <SwiperSlide key={product.id}>
+            <SwiperSlide key={product.id} className='items-stretch'>
               <ProductCard product={product} />
             </SwiperSlide>
           ))}

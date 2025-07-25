@@ -53,82 +53,87 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
   const { products, loading: productsLoading } = useProducts();
 
   // ✅ FIXED: Helper function to clean features - handles mixed string/boolean types
-  const cleanFeatures = (features: (string | boolean)[] | undefined): string[] => {
+  const cleanFeatures = (
+    features: (string | boolean)[] | undefined
+  ): string[] => {
     if (!features || !Array.isArray(features)) return [];
-    
+
     return features
       .filter((feature): feature is string => {
         // Type guard to ensure we have valid strings only
-        return feature !== null && 
-               feature !== undefined &&
-               typeof feature === 'string' && 
-               feature !== 'null' && 
-               feature !== 'undefined' &&
-               feature.trim().length > 3;
+        return (
+          feature !== null &&
+          feature !== undefined &&
+          typeof feature === "string" &&
+          feature !== "null" &&
+          feature !== "undefined" &&
+          feature.trim().length > 3
+        );
       })
-      .map(feature => {
+      .map((feature) => {
         // Decode HTML entities and clean up
         let cleaned = feature
-          .replace(/&nbsp;/g, ' ')           // Replace &nbsp; with spaces
-          .replace(/&amp;/g, '&')           // Replace &amp; with &
-          .replace(/&lt;/g, '<')            // Replace &lt; with <
-          .replace(/&gt;/g, '>')            // Replace &gt; with >
-          .replace(/\?/g, ':')              // Replace ? with : for better formatting
-          .replace(/\s+/g, ' ')             // Replace multiple spaces with single space
-          .trim();                          // Remove leading/trailing spaces
-        
+          .replace(/&nbsp;/g, " ") // Replace &nbsp; with spaces
+          .replace(/&amp;/g, "&") // Replace &amp; with &
+          .replace(/&lt;/g, "<") // Replace &lt; with <
+          .replace(/&gt;/g, ">") // Replace &gt; with >
+          .replace(/\?/g, ":") // Replace ? with : for better formatting
+          .replace(/\s+/g, " ") // Replace multiple spaces with single space
+          .trim(); // Remove leading/trailing spaces
+
         // If it looks like "Key : Value", format it better
-        if (cleaned.includes(':')) {
-          const [key, value] = cleaned.split(':').map(s => s.trim());
-          if (key && value && value !== 'null') {
+        if (cleaned.includes(":")) {
+          const [key, value] = cleaned.split(":").map((s) => s.trim());
+          if (key && value && value !== "null") {
             return `${key}: ${value}`;
           }
         }
-        
+
         return cleaned;
       })
-      .filter(feature => feature && !feature.includes('null')); // Final cleanup
+      .filter((feature) => feature && !feature.includes("null")); // Final cleanup
   };
 
   // ✅ FIXED: Helper function to safely convert to boolean with null checking
   const safeBooleanValue = (value: any): boolean => {
     if (value === null || value === undefined) return false;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true' || value === '1';
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      return value.toLowerCase() === "true" || value === "1";
     }
     return Boolean(value);
   };
 
   // ✅ FIXED: Helper function to safely convert description to clean string
   const safeStringValue = (value: any): string => {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'string') return value;
-    if (typeof value === 'boolean') return value.toString();
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "boolean") return value.toString();
     return String(value);
   };
 
   // ✅ FIXED: Helper function to clean description text
   const cleanDescription = (description: any): string => {
     const rawDescription = safeStringValue(description);
-    if (!rawDescription || rawDescription.length === 0) return 'No description available.';
-    
+    if (!rawDescription || rawDescription.length === 0)
+      return "No description available.";
+
     return rawDescription
-      .replace(/&nbsp;/g, ' ')           // Replace &nbsp; with spaces
-      .replace(/&amp;/g, '&')           // Replace &amp; with &
-      .replace(/&lt;/g, '<')            // Replace &lt; with <
-      .replace(/&gt;/g, '>')            // Replace &gt; with >
-      .replace(/\?&nbsp;/g, ': ')       // Replace "?&nbsp;" with ": "
-      .replace(/\?\s+/g, ': ')          // Replace "? " with ": "
-      .replace(/\s+/g, ' ')             // Replace multiple spaces with single space
-      .trim();                          // Remove leading/trailing spaces
+      .replace(/&nbsp;/g, " ") // Replace &nbsp; with spaces
+      .replace(/&amp;/g, "&") // Replace &amp; with &
+      .replace(/&lt;/g, "<") // Replace &lt; with <
+      .replace(/&gt;/g, ">") // Replace &gt; with >
+      .replace(/\?&nbsp;/g, ": ") // Replace "?&nbsp;" with ": "
+      .replace(/\?\s+/g, ": ") // Replace "? " with ": "
+      .replace(/\s+/g, " ") // Replace multiple spaces with single space
+      .trim(); // Remove leading/trailing spaces
   };
 
   // ✅ FIXED: Safe access to product properties with null checking
   const getProductBooleans = (product: Product | null) => {
     if (!product) return { isInStock: false };
     return {
-      isInStock: safeBooleanValue(product.inStock)
+      isInStock: safeBooleanValue(product.inStock),
     };
   };
 
@@ -386,7 +391,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            Added {quantity} x {product?.itemName || 'item'} to cart!
+            Added {quantity} x {product?.itemName || "item"} to cart!
           </div>
         </div>
       )}
@@ -407,9 +412,9 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
       )}
 
       <div className="w-full max-w-[1400px] mx-auto">
-        <div className="min-h-[100%] pb-8 pt-8">
+        <div className="min-h-[100%] pb-4 pt-4">
           {/* Breadcrumb with Home Icon */}
-          <div className="w-[95%] overflow-x-auto py-3 pr-4 mr-4">
+          <div className="w-[95%] overflow-x-auto py-3 px-4 mr-4">
             <nav className="flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
               {breadcrumbs.map((item, index) => (
                 <React.Fragment key={index}>
@@ -466,7 +471,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
           </div>
 
           {/* Main Product Section */}
-          <div className="w-full mx-auto px-4 py-8">
+          <div className="w-full mx-auto px-4 pt-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               {/* Left Side - Images (Thumbnails + Main Image) */}
               <div className="flex gap-4">
@@ -514,10 +519,10 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
               </div>
 
               {/* Right Side - Product Info */}
-              <div className="space-y-6 h-fit">
+              <div className="space-y-3 sm:space-y-6 h-fit">
                 {/* Product Title & Status */}
                 <div>
-                  <h1 className="text-2xl sm:text-3xl text-gray-900 mb-2">
+                  <h1 className="text-2xl sm:text-3xl font-medium text-gray-900 mb-2">
                     {product.itemName}
                   </h1>
                   <span
@@ -533,7 +538,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
 
                 {/* Price */}
                 <div className="space-y-2">
-                  <div className="text-2xl sm:text-4xl text-gray-900 mb-4">
+                  <div className="text-2xl sm:text-4xl text-gray-900 mb-4 border-b border-b-gray-400 pb-2 mb-4">
                     {formatPrice(product.amount)}
                   </div>
                   {product.originalPrice &&
@@ -552,7 +557,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
 
                 {/* Product Details */}
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 text-[10px]  sm:text-[14px]">
+                  <div className="grid grid-cols-1 gap-1 sm:gap-4 text-[10px]  sm:text-[14px]">
                     <div>
                       <span className="font-medium text-gray-700">Brand:</span>
                       <span className="ml-2 text-gray-900">
@@ -589,9 +594,15 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-3 text-[15px]  sm:text-[18px]">
                     Description
+                    <div className="relative mb-6">
+                      <span className="relative z-10 block w-[25%] h-1 mt-1 bg-[#008ECC] rounded-full"></span>
+                      <span className="absolute left-[0%] top-[40%] block w-[100%] h-0.5 bg-gray-100 mb-1 rounded-full"></span>
+                    </div>
                   </h3>
                   <p className="text-gray-700 text-[10px]  sm:text-[14px] leading-relaxed max-h-[150px] overflow-y-auto">
-                    {product ? cleanDescription(product.description) : 'No description available.'}
+                    {product
+                      ? cleanDescription(product.description)
+                      : "No description available."}
                   </p>
                 </div>
 

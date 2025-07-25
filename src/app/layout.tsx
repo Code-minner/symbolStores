@@ -1,13 +1,12 @@
 // src/app/layout.tsx - Fixed SSR Issue
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { CartProvider } from '@/lib/CartContext';
-import { WishlistProvider } from '@/lib/WishlistContext';
+import { CartProvider } from "@/lib/CartContext";
+import { WishlistProvider } from "@/lib/WishlistContext";
 import "../styles/globals.css";
-import 'swiper/css';
-import 'swiper/css/navigation';
-import { AuthProvider } from '@/contexts/AuthContext';
-
+import "swiper/css";
+import "swiper/css/navigation";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,7 +20,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SymbolStore - Your Electronics Store",
-  description: "Shop the latest electronics, home appliances, and more at great prices",
+  description:
+    "Shop the latest electronics, home appliances, and more at great prices",
+  icons: {
+    icon: "/assets/SymbolStoreicon.jpg", // or /logo.png if it's png
+  },
 };
 
 export default function RootLayout({
@@ -40,12 +43,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-         <AuthProvider>
+        <AuthProvider>
           <WishlistProvider>
-        <CartProvider>          
-          {children}      
-        </CartProvider>
-        </WishlistProvider>
+            <CartProvider>{children}</CartProvider>
+          </WishlistProvider>
         </AuthProvider>
       </body>
     </html>
