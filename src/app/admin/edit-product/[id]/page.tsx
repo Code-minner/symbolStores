@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/contexts/AuthContext';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 
 type FormDataType = {
   itemName: string;
@@ -30,18 +30,18 @@ export default function EditProductPage() {
   const productId = params.id as string;
 
   const [formData, setFormData] = useState<FormDataType>({
-    itemName: '',
-    category: '',
-    subcategory: '',
-    brand: '',
-    description: '',
-    features: '',
-    tags: '',
-    amount: '',
-    originalPrice: '',
-    status: 'in stock',
-    sku: '',
-    warranty: '',
+    itemName: "",
+    category: "",
+    subcategory: "",
+    brand: "",
+    description: "",
+    features: "",
+    tags: "",
+    amount: "",
+    originalPrice: "",
+    status: "in stock",
+    sku: "",
+    warranty: "",
   });
 
   const [images, setImages] = useState<File[]>([]);
@@ -49,48 +49,164 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [currentUpload, setCurrentUpload] = useState('');
+  const [currentUpload, setCurrentUpload] = useState("");
 
   // Categories and subcategories (same as add product)
   const categories = [
-    "Home & Kitchen", "Furniture", "TV", "Generator", "Freezers", 
-    "Microwave", "Air Conditioner", "Blender", "Audio Bass", "Others"
+    "Home & Kitchen",
+    "Furniture",
+    "TV",
+    "Generator",
+    "Freezers",
+    "Microwave",
+    "Air Conditioner",
+    "Blender",
+    "Audio Bass",
+    "Others",
   ];
 
   const categorySubItems: { [key: string]: string[] } = {
-    "Home & Kitchen": ["Toast", "Air Fryer", "Electric Kettle", "Griller", "Hotplate", "Hand Mixer", "Vacuum Cleaner", "Slow Juicer", "Jug Kettle", "Coffee Maker", "Sandwich Maker", "Mixer Grinder"],
-    "Furniture": ["Sofa", "Dining Table", "Bed", "Wardrobe", "Chair", "Desk", "Cabinet", "Bookshelf"],
-    "TV": ["LED TV", "OLED TV", "Smart TV", "4K TV", "8K TV", "Android TV", "UHD TV"],
-    "Generator": ["Petrol Generator", "Diesel Generator", "Gas Generator", "Solar Generator", "Inverter Generator", "Manual starter"],
-    "Freezers": ["Chest Freezer", "Upright Freezer", "Mini Freezer", "Deep Freezer", "Bottom Freezer Refrigerator"],
-    "Microwave": ["Solo Microwave", "Grill Microwave", "Convection Microwave", "Built-in Microwave"],
-    "Air Conditioner": ["Split AC", "Window AC", "Portable AC", "Central AC", "Cassette AC", "Inverter Air Conditioner"],
-    "Blender": ["Hand Blender", "Stand Blender", "Smoothie Blender", "Food Processor"],
-    "Audio Bass": ["Speakers", "Headphones", "Sound Bar", "Home Theater", "Bluetooth Speaker"],
-    "Others": ["Accessories", "Parts", "Tools", "Gadgets"]
+    "Home & Kitchen": [
+      "Toast",
+      "Air Fryer",
+      "Electric Kettle",
+      "Griller",
+      "Hotplate",
+      "Hand Mixer",
+      "Vacuum Cleaner",
+      "Slow Juicer",
+      "Jug Kettle",
+      "Coffee Maker",
+      "Sandwich Maker",
+      "Mixer Grinder",
+    ],
+    Furniture: [
+      "Sofa",
+      "Dining Table",
+      "Bed",
+      "Wardrobe",
+      "Chair",
+      "Desk",
+      "Cabinet",
+      "Bookshelf",
+    ],
+    TV: [
+      "LED TV",
+      "OLED TV",
+      "Smart TV",
+      "4K TV",
+      "8K TV",
+      "Android TV",
+      "UHD TV",
+    ],
+    Generator: [
+      "Petrol Generator",
+      "Diesel Generator",
+      "Gas Generator",
+      "Solar Generator",
+      "Inverter Generator",
+      "Manual starter",
+    ],
+    Freezers: [
+      "Chest Freezer",
+      "Upright Freezer",
+      "Mini Freezer",
+      "Deep Freezer",
+      "Bottom Freezer Refrigerator",
+    ],
+    Microwave: [
+      "Solo Microwave",
+      "Grill Microwave",
+      "Convection Microwave",
+      "Built-in Microwave",
+    ],
+    "Air Conditioner": [
+      "Split AC",
+      "Window AC",
+      "Portable AC",
+      "Central AC",
+      "Cassette AC",
+      "Inverter Air Conditioner",
+    ],
+    Blender: [
+      "Hand Blender",
+      "Stand Blender",
+      "Smoothie Blender",
+      "Food Processor",
+    ],
+    "Audio Bass": [
+      "Speakers",
+      "Headphones",
+      "Sound Bar",
+      "Home Theater",
+      "Bluetooth Speaker",
+    ],
+    Others: ["Accessories", "Parts", "Tools", "Gadgets"],
   };
 
-const brands = [
-  "Samsung", "Huawei","Gotv", "Haier Thermocol", "Hisense", "Bruhm", "LG", "DAIKIN", "KENWOOD",
-  "Binatone", "Panasonic", "Scanfrost", "Sony", "SUMEC", "GREE", "Midea",
-  "MAXI",  "Aeon", "Toshiba", "KENSTAR", "TCL", "Royal",
-  "Rite-Tek", "SYINIX", "INFINIX", "DELTA", "TRANE", "beko", "F&D",
-  "HOME FLOWER", "HARVELLS", "OX", "Century", "Nexus", "Nature Power",
-  "Navkar", "D-MARC", "Sonik", "Enkor", "Saisho", "Firman", "Power Deluxe",
-  "Itel Safer", "VBT-AX", "APC", "ZVT", "Sollatek", "TBK BIANCO", "Tigmax",
-  "ELEPAQ", "KEMAGE"
-];
-
+  const brands = [
+    "Samsung",
+    "Huawei",
+    "Gotv",
+    "Haier Thermocol",
+    "Hisense",
+    "Bruhm",
+    "LG",
+    "DAIKIN",
+    "KENWOOD",
+    "Binatone",
+    "Panasonic",
+    "Scanfrost",
+    "Sony",
+    "SUMEC",
+    "GREE",
+    "Midea",
+    "MAXI",
+    "Aeon",
+    "Toshiba",
+    "KENSTAR",
+    "TCL",
+    "Royal",
+    "Rite-Tek",
+    "SYINIX",
+    "INFINIX",
+    "DELTA",
+    "TRANE",
+    "beko",
+    "F&D",
+    "HOME FLOWER",
+    "HARVELLS",
+    "OX",
+    "Century",
+    "Nexus",
+    "Nature Power",
+    "Navkar",
+    "D-MARC",
+    "Sonik",
+    "Enkor",
+    "Saisho",
+    "Firman",
+    "Power Deluxe",
+    "Itel Safer",
+    "VBT-AX",
+    "APC",
+    "ZVT",
+    "Sollatek",
+    "TBK BIANCO",
+    "Tigmax",
+    "ELEPAQ",
+    "KEMAGE",
+  ];
 
   // Check admin access and load product
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
-        router.push('/admin/login');
+        router.push("/admin/login");
         return;
       }
       if (!userData?.isAdmin) {
-        router.push('/');
+        router.push("/");
         return;
       }
       loadProduct();
@@ -99,30 +215,34 @@ const brands = [
 
   const loadProduct = async () => {
     try {
-      const productDoc = await getDoc(doc(db, 'products', productId));
-      
+      const productDoc = await getDoc(doc(db, "products", productId));
+
       if (!productDoc.exists()) {
-        alert('Product not found!');
-        router.push('/admin/dashboard');
+        alert("Product not found!");
+        router.push("/admin/dashboard");
         return;
       }
 
       const productData = productDoc.data();
-      
+
       // Populate form with existing data
       setFormData({
-        itemName: productData.itemName || '',
-        category: productData.category || '',
-        subcategory: productData.subcategory || '',
-        brand: productData.brand || '',
-        description: productData.description || '',
-        features: Array.isArray(productData.features) ? productData.features.join('\n') : '',
-        tags: Array.isArray(productData.tags) ? productData.tags.join(', ') : '',
-        amount: productData.amount?.toString() || '',
-        originalPrice: productData.originalPrice?.toString() || '',
-        status: productData.status || 'in stock',
-        sku: productData.sku || '',
-        warranty: productData.warranty || '',
+        itemName: productData.itemName || "",
+        category: productData.category || "",
+        subcategory: productData.subcategory || "",
+        brand: productData.brand || "",
+        description: productData.description || "",
+        features: Array.isArray(productData.features)
+          ? productData.features.join("\n")
+          : "",
+        tags: Array.isArray(productData.tags)
+          ? productData.tags.join(", ")
+          : "",
+        amount: productData.amount?.toString() || "",
+        originalPrice: productData.originalPrice?.toString() || "",
+        status: productData.status || "in stock",
+        sku: productData.sku || "",
+        warranty: productData.warranty || "",
       });
 
       // Set existing images
@@ -131,11 +251,10 @@ const brands = [
       } else if (productData.imageURL) {
         setExistingImages([productData.imageURL]);
       }
-
     } catch (error) {
-      console.error('Error loading product:', error);
-      alert('Error loading product data');
-      router.push('/admin/dashboard');
+      console.error("Error loading product:", error);
+      alert("Error loading product data");
+      router.push("/admin/dashboard");
     } finally {
       setPageLoading(false);
     }
@@ -143,14 +262,14 @@ const brands = [
 
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
       const img = new Image();
-      
+
       img.onload = () => {
         const maxSize = 800;
         let { width, height } = img;
-        
+
         if (width > height) {
           if (width > maxSize) {
             height = (height * maxSize) / width;
@@ -162,49 +281,61 @@ const brands = [
             height = maxSize;
           }
         }
-        
+
         canvas.width = width;
         canvas.height = height;
         ctx?.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-          } else {
-            reject(new Error('Compression failed'));
-          }
-        }, 'image/jpeg', 0.8);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: "image/jpeg" }));
+            } else {
+              reject(new Error("Compression failed"));
+            }
+          },
+          "image/jpeg",
+          0.8
+        );
       };
-      
-      img.onerror = () => reject(new Error('Failed to load image'));
+
+      img.onerror = () => reject(new Error("Failed to load image"));
       img.src = URL.createObjectURL(file);
     });
   };
 
   const uploadToCloudinary = async (image: File): Promise<string> => {
     const formData = new FormData();
-    formData.append('file', image);
-    formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!);
-    formData.append('cloud_name', process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!);
-    
+    formData.append("file", image);
+    formData.append(
+      "upload_preset",
+      process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!
+    );
+    formData.append(
+      "cloud_name",
+      process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!
+    );
+
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
       {
-        method: 'POST',
+        method: "POST",
         body: formData,
       }
     );
-    
+
     if (!response.ok) {
       throw new Error(`Upload failed: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data.secure_url;
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -220,9 +351,9 @@ const brands = [
     if (!files) return;
 
     const selected = Array.from(files).slice(0, 3);
-    
+
     for (const file of selected) {
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         alert(`${file.name} is not an image file`);
         return;
       }
@@ -231,22 +362,21 @@ const brands = [
         return;
       }
     }
-    
+
     try {
       setCurrentUpload("Processing images...");
-      
+
       const compressedFiles = [];
       for (const file of selected) {
         const compressed = await compressImage(file);
         compressedFiles.push(compressed);
       }
-      
+
       setImages(compressedFiles);
       setCurrentUpload("");
-      
     } catch (error) {
-      console.error('Error processing images:', error);
-      alert('Error processing images. Please try again.');
+      console.error("Error processing images:", error);
+      alert("Error processing images. Please try again.");
       setCurrentUpload("");
     }
   };
@@ -264,45 +394,48 @@ const brands = [
       alert("Product name is required");
       return false;
     }
-    
+
     if (!formData.category) {
       alert("Category is required");
       return false;
     }
-    
+
     if (!formData.subcategory) {
       alert("Subcategory is required");
       return false;
     }
-    
+
     if (!formData.brand) {
       alert("Brand is required");
       return false;
     }
-    
-    if (!formData.description.trim() || formData.description.trim().length < 10) {
+
+    if (
+      !formData.description.trim() ||
+      formData.description.trim().length < 10
+    ) {
       alert("Product description is required (minimum 10 characters)");
       return false;
     }
-    
+
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       alert("Valid selling price is required");
       return false;
     }
-    
+
     if (existingImages.length === 0 && images.length === 0) {
       alert("At least one product image is required");
       return false;
     }
-    
+
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setLoading(true);
     setUploadProgress(0);
     setCurrentUpload("Updating product...");
@@ -313,26 +446,25 @@ const brands = [
       // Upload new images if any
       if (images.length > 0) {
         setCurrentUpload("Uploading new images...");
-        
+
         for (let i = 0; i < images.length; i++) {
           const image = images[i];
-          
+
           try {
             setCurrentUpload(`Uploading image ${i + 1} of ${images.length}...`);
             setUploadProgress((i / images.length) * 80);
-            
+
             const downloadURL = await uploadToCloudinary(image);
             finalImageURLs.push(downloadURL);
-            
           } catch (uploadError: any) {
             console.error(`Upload failed for image ${i + 1}:`, uploadError);
-            
+
             const skipImage = confirm(
               `Image ${i + 1} failed to upload.\n\nClick OK to skip this image and continue, or Cancel to stop.`
             );
-            
+
             if (!skipImage) {
-              throw new Error('Upload stopped by user');
+              throw new Error("Upload stopped by user");
             }
           }
         }
@@ -343,14 +475,14 @@ const brands = [
 
       // Convert features and tags
       const featuresArray = formData.features
-        .split('\n')
-        .filter(feature => feature.trim() !== '')
-        .map(feature => feature.trim());
+        .split("\n")
+        .filter((feature) => feature.trim() !== "")
+        .map((feature) => feature.trim());
 
       const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag !== '');
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter((tag) => tag !== "");
 
       const updateData = {
         itemName: formData.itemName.trim(),
@@ -361,7 +493,9 @@ const brands = [
         features: featuresArray,
         tags: tagsArray,
         amount: parseFloat(formData.amount),
-        originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
+        originalPrice: formData.originalPrice
+          ? parseFloat(formData.originalPrice)
+          : null,
         status: formData.status,
         warranty: formData.warranty.trim() || null,
         imageURL: finalImageURLs[0], // Main image
@@ -376,10 +510,12 @@ const brands = [
 
       alert("✅ Product updated successfully!");
       router.push("/admin/dashboard");
-      
     } catch (err: any) {
       console.error("Error updating product:", err);
-      alert("❌ Error: " + (err.message || "Something went wrong. Please try again."));
+      alert(
+        "❌ Error: " +
+          (err.message || "Something went wrong. Please try again.")
+      );
     } finally {
       setLoading(false);
       setUploadProgress(0);
@@ -400,11 +536,10 @@ const brands = [
       <Header />
       <div className="py-16 px-4 bg-gray-50 min-h-screen">
         <div className="w-full max-w-[1400px] mx-auto">
-
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <button
-              onClick={() => router.push('/admin/dashboard')}
+              onClick={() => router.push("/admin/dashboard")}
               className="flex items-center px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
             >
               ← Back to Dashboard
@@ -419,7 +554,7 @@ const brands = [
               <h3 className="text-lg font-semibold mb-4 text-gray-800">
                 Product Images <span className="text-red-500">*</span>
               </h3>
-              
+
               {/* Existing Images */}
               {existingImages.length > 0 && (
                 <div className="mb-6">
@@ -428,7 +563,10 @@ const brands = [
                   </h4>
                   <div className="grid grid-cols-3 gap-4">
                     {existingImages.map((imageUrl, idx) => (
-                      <div key={idx} className="relative border rounded-lg overflow-hidden group">
+                      <div
+                        key={idx}
+                        className="relative border rounded-lg overflow-hidden group"
+                      >
                         <img
                           src={imageUrl}
                           alt={`Current ${idx + 1}`}
@@ -464,14 +602,31 @@ const brands = [
                   id="fileInput"
                   disabled={loading}
                 />
-                <label htmlFor="fileInput" className={`cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <label
+                  htmlFor="fileInput"
+                  className={`cursor-pointer ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    <svg
+                      className="w-8 h-8 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
                     </svg>
                   </div>
-                  <p className="text-gray-600 mb-2 font-medium">Add more images</p>
-                  <p className="text-sm text-gray-500">Maximum 3 additional images</p>
+                  <p className="text-gray-600 mb-2 font-medium">
+                    Add more images
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Maximum 3 additional images
+                  </p>
                 </label>
               </div>
 
@@ -483,7 +638,7 @@ const brands = [
                     <span>{uploadProgress.toFixed(0)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div 
+                    <div
                       className="bg-blue-500 h-3 rounded-full transition-all duration-500"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
@@ -499,7 +654,10 @@ const brands = [
                   </h4>
                   <div className="grid grid-cols-3 gap-4">
                     {images.map((img, idx) => (
-                      <div key={idx} className="relative border rounded-lg overflow-hidden group">
+                      <div
+                        key={idx}
+                        className="relative border rounded-lg overflow-hidden group"
+                      >
                         <img
                           src={URL.createObjectURL(img)}
                           alt={`New ${idx + 1}`}
@@ -525,9 +683,10 @@ const brands = [
 
             {/* Form Section - Same as add product but with pre-filled values */}
             <div className="bg-white rounded-lg p-6 shadow-lg">
-              <h3 className="text-lg font-semibold mb-6 text-gray-800">Product Information</h3>
+              <h3 className="text-lg font-semibold mb-6 text-gray-800">
+                Product Information
+              </h3>
               <form onSubmit={handleSubmit} className="space-y-6">
-                
                 {/* Product Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -561,7 +720,9 @@ const brands = [
                     >
                       <option value="">Select Category</option>
                       {categories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -578,9 +739,12 @@ const brands = [
                       className="w-full p-3 border border-gray-300 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Subcategory</option>
-                      {formData.category && categorySubItems[formData.category]?.map((subcat) => (
-                        <option key={subcat} value={subcat}>{subcat}</option>
-                      ))}
+                      {formData.category &&
+                        categorySubItems[formData.category]?.map((subcat) => (
+                          <option key={subcat} value={subcat}>
+                            {subcat}
+                          </option>
+                        ))}
                     </select>
                   </div>
                 </div>
@@ -601,7 +765,9 @@ const brands = [
                     >
                       <option value="">Select Brand</option>
                       {brands.map((brand) => (
-                        <option key={brand} value={brand}>{brand}</option>
+                        <option key={brand} value={brand}>
+                          {brand}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -640,7 +806,8 @@ const brands = [
                 {/* Key Features */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Key Features <span className="text-gray-500">(Optional)</span>
+                    Key Features{" "}
+                    <span className="text-gray-500">(Optional)</span>
                   </label>
                   <textarea
                     name="features"
@@ -674,7 +841,8 @@ const brands = [
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Original Price (₦) <span className="text-gray-500">(Optional)</span>
+                      Original Price (₦){" "}
+                      <span className="text-gray-500">(Optional)</span>
                     </label>
                     <input
                       type="number"
@@ -753,9 +921,25 @@ const brands = [
                   >
                     {loading ? (
                       <span className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
                         </svg>
                         Updating Product...
                       </span>

@@ -1,0 +1,42 @@
+# netlify.toml - Netlify Configuration
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+# Netlify Functions Configuration
+[functions]
+  directory = "netlify/functions"
+
+# API Routes Configuration
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Edge Functions for API routes
+[[edge_functions]]
+  function = "auto-verify-payments"
+  path = "/api/cron/auto-verify-payments"
+
+# Environment Variables (set these in Netlify dashboard)
+# CRON_SECRET=your-secret-key
+# ADMIN_EMAIL=your-admin@yourdomain.com
+# FROM_EMAIL=system@yourdomain.com
+# NEXT_PUBLIC_APP_URL=https://your-netlify-site.netlify.app
+
+# Headers for security
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Redirects and rewrites
+[[redirects]]
+  from = "/admin"
+  to = "/admin/"
+  status = 200
+
+# Function timeout settings
+[functions.auto-verify-payments]
+  timeout = 300

@@ -177,3 +177,21 @@ body {
     display: none;
   }
 }
+
+
+/* src/app/globals.css or your main CSS file */
+
+@keyframes slideInDown {
+  from {
+    transform: translate(-50%, -100%); /* Start above the screen */
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0); /* End at its position */
+    opacity: 1;
+  }
+}
+
+.animate-slideInDown {
+  animation: slideInDown 0.3s ease-out forwards; /* 0.3s for speed */
+}

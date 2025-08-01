@@ -392,7 +392,7 @@ export default function Home() {
                     src="/assets/image 14.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-scale"
+                    className="object-contain"
                   />
                 </div>
                 <div className="relative w-full h-[200px] sm:h-[30vh] mb-4">
@@ -400,7 +400,7 @@ export default function Home() {
                     src="/assets/image 15.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-scale object-top"
+                    className="object-contain object-top"
                   />
                 </div>
 
@@ -409,7 +409,7 @@ export default function Home() {
                     src="/assets/image 13.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-scale"
+                    className="object-contain object-top"
                   />
                 </div>
               </div>

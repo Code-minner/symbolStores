@@ -7,12 +7,14 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { OrderService } from "@/lib/orderService";
 
 // TypeScript interfaces
 interface OrderActivity {
   message: string;
   date: string;
-  type: "delivered" | "pickup" | "hub" | "transit" | "verified" | "confirmed";
+  type: "delivered" | "pickup" | "hub" | "transit" | "verified" | "confirmed" | "payment_submitted" | "payment_failed" | "processing" | "shipped";
+  completed?: boolean;
 }
 
 interface TrackingData {
@@ -23,17 +25,49 @@ interface TrackingData {
   total: string;
   currentStage: number;
   activities: OrderActivity[];
+  paymentMethod?: 'flutterwave' | 'bank_transfer';
+  status?: string;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    bankName: string;
+  };
+  proofSubmitted?: boolean;
+  transactionId?: string;
+  reference?: string;
 }
 
-interface Order {
+interface DashboardOrder {
   id: string;
+  orderId?: string;
+  userId?: string;
   status: string;
   date: string;
   total: string;
+  totalAmount?: number;
   products: number;
-  items: string[];
-  userId: string;
-  createdAt: any;
+  items: any[];
+  createdAt?: any;
+  orderDate?: string;
+  paymentMethod?: 'flutterwave' | 'bank_transfer';
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    bankName: string;
+  };
+  proofOfPayment?: {
+    filename: string;
+    fileUrl: string;
+    uploadedAt: any;
+  };
+  paymentSubmittedAt?: any;
+  paymentVerifiedAt?: any;
+  transactionId?: string;
+  reference?: string;
+  paymentStatus?: string;
 }
 
 interface FormData {
@@ -205,6 +239,28 @@ const X: React.FC<IconProps> = ({ size = 20, className = "" }) => (
   </svg>
 );
 
+// Custom Alert Dialog Component
+interface AlertDialogProps {
+  message: string;
+  onClose: () => void;
+}
+
+const AlertDialog: React.FC<AlertDialogProps> = ({ message, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
+      <div className="bg-white rounded-lg p-6 max-w-sm mx-auto shadow-lg">
+        <p className="text-gray-800 text-center mb-4">{message}</p>
+        <button
+          onClick={onClose}
+          className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const UserDashboard = () => {
   // 🔐 FIREBASE AUTHENTICATION HOOKS
   const { user, userData, loading: authLoading } = useAuth();
@@ -223,14 +279,15 @@ const UserDashboard = () => {
   // Component State
   const [activeTab, setActiveTab] = useState<string>("profile");
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<DashboardOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState<boolean>(false);
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<DashboardOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [changingPassword, setChangingPassword] = useState<boolean>(false);
-  const [formInitialized, setFormInitialized] = useState<boolean>(false); // 🔧 NEW: Track if form was populated
+  const [formInitialized, setFormInitialized] = useState<boolean>(false);
+  const [alertDialog, setAlertDialog] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
 
   const [trackingForm, setTrackingForm] = useState<{
     orderId: string;
@@ -303,33 +360,149 @@ const UserDashboard = () => {
     "Zamfara",
   ];
 
-  // 🔐 ENHANCED AUTHENTICATION CHECK (FIXED VERSION)
+  // Helper functions
+  const getOrderStage = (status: string, paymentMethod?: string): number => {
+    if (paymentMethod === "flutterwave") {
+      switch (status.toLowerCase()) {
+        case "pending":
+          return 0;
+        case "confirmed":
+        case "completed":
+          return 1;
+        case "processing":
+          return 2;
+        case "shipped":
+          return 3;
+        case "delivered":
+          return 4;
+        default:
+          return 1;
+      }
+    } else {
+      switch (status.toLowerCase()) {
+        case "pending_payment":
+          return 0;
+        case "payment_submitted":
+          return 1;
+        case "payment_verified":
+        case "confirmed":
+          return 2;
+        case "processing":
+          return 3;
+        case "shipped":
+          return 4;
+        case "delivered":
+          return 5;
+        default:
+          return 0;
+      }
+    }
+  };
+
+  const generateOrderActivities = (order: DashboardOrder): OrderActivity[] => {
+    const activities: OrderActivity[] = [];
+
+    if (order.paymentMethod === "flutterwave") {
+      activities.push({
+        message: `Order ${order.orderId || order.id} placed and paid successfully`,
+        date: order.orderDate || order.date,
+        type: "confirmed",
+        completed: true,
+      });
+
+      if (order.status.toLowerCase() !== "pending") {
+        activities.push({
+          message: "Payment confirmed automatically via Flutterwave",
+          date: order.orderDate || order.date,
+          type: "verified",
+          completed: true,
+        });
+      }
+    } else {
+      activities.push({
+        message: `Order ${order.orderId || order.id} placed - awaiting payment`,
+        date: order.orderDate || order.date,
+        type: "confirmed",
+        completed: true,
+      });
+
+      if (order.paymentSubmittedAt) {
+        activities.push({
+          message: "Proof of payment submitted for verification",
+          date: order.paymentSubmittedAt.toDate?.()?.toLocaleDateString() || "Recently",
+          type: "payment_submitted",
+          completed: true,
+        });
+      }
+
+      if (order.paymentVerifiedAt) {
+        activities.push({
+          message: "Payment verified and confirmed",
+          date: order.paymentVerifiedAt.toDate?.()?.toLocaleDateString() || "Recently",
+          type: "verified",
+          completed: true,
+        });
+      }
+    }
+
+    if (["processing", "shipped", "delivered"].includes(order.status.toLowerCase())) {
+      activities.push({
+        message: "Order is being prepared for shipment",
+        date: order.orderDate || order.date,
+        type: "processing",
+        completed: order.status.toLowerCase() !== "processing",
+      });
+    }
+
+    if (["shipped", "delivered"].includes(order.status.toLowerCase())) {
+      activities.push({
+        message: "Order has been shipped",
+        date: order.orderDate || order.date,
+        type: "shipped",
+        completed: order.status.toLowerCase() !== "shipped",
+      });
+    }
+
+    if (order.status.toLowerCase() === "delivered") {
+      activities.push({
+        message: "Order has been delivered successfully",
+        date: order.orderDate || order.date,
+        type: "delivered",
+        completed: true,
+      });
+    }
+
+    return activities.reverse();
+  };
+
+  const calculateExpectedDelivery = (order: DashboardOrder): string => {
+    if (order.paymentMethod === "flutterwave") {
+      return "2-4 business days";
+    } else {
+      switch (order.status.toLowerCase()) {
+        case "pending_payment":
+          return "Pending payment verification";
+        case "payment_submitted":
+          return "Pending payment verification + 3-5 business days";
+        case "payment_verified":
+        case "confirmed":
+          return "3-5 business days";
+        case "processing":
+          return "2-3 business days";
+        case "shipped":
+          return "1-2 business days";
+        default:
+          return "3-5 business days";
+      }
+    }
+  };
+
+  // 🔐 ENHANCED AUTHENTICATION CHECK
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/auth?redirect=/dashboard");
       return;
     }
-
-    // if (!authLoading) {
-    //   if (!user) {
-    //     // No Firebase Auth user - redirect to login
-    //     router.push("/auth?redirect=/dashboard");
-    //     return;
-    //   }
-
-    //   // Give userData some time to load after user authentication
-    //   if (user && userData === null) {
-    //     const timeoutId = setTimeout(() => {
-    //       // Only redirect if userData is still null after 3 seconds
-    //       if (userData === null) {
-    //         console.warn("User authenticated but no user document found");
-    //         router.push("/auth?redirect=/dashboard&message=account_not_found");
-    //       }
-    //     }, 3000); // Wait 3 seconds for userData to load
-
-    //     return () => clearTimeout(timeoutId);
-    //   }
-    // }
   }, [user, userData, authLoading, router]);
 
   // Additional check for URL message parameters
@@ -339,16 +512,14 @@ const UserDashboard = () => {
       const message = urlParams.get("message");
 
       if (message === "account_not_found") {
-        alert("Your account was not found. Please sign in again.");
+        setAlertDialog({ message: "Your account was not found. Please sign in again.", visible: true });
       } else if (message === "authentication_required") {
-        alert(
-          "Authentication required. Please sign in to access your dashboard."
-        );
+        setAlertDialog({ message: "Authentication required. Please sign in to access your dashboard.", visible: true });
       }
     }
   }, []);
 
-  // 📝 FIXED: POPULATE FORM DATA ONLY ONCE (prevents overriding user input)
+  // 📝 POPULATE FORM DATA ONLY ONCE
   useEffect(() => {
     if (userData && user && !formInitialized) {
       console.log("🔍 Initializing form data for the first time...");
@@ -370,44 +541,51 @@ const UserDashboard = () => {
 
       setFormInitialized(true);
       console.log("✅ Form initialized with user data");
-    } else if (userData && user && formInitialized) {
-      console.log("⚠️ Form already initialized - SKIPPING override"); // 🔧 ADD THIS
     }
   }, [userData, user, formInitialized]);
 
-  // 📦 FIXED ORDERS FETCH (no composite index required)
+  // ✅ ENHANCED ORDER FETCH with OrderService
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!user) return;
+      if (!user || !user.uid) {
+        console.log("No authenticated user, skipping order fetch");
+        setOrdersLoading(false);
+        return;
+      }
 
       setOrdersLoading(true);
       try {
         console.log("📦 Fetching orders for user:", user.uid);
 
-        // 🔧 Simple query - only filter by userId (no orderBy to avoid index requirement)
-        const ordersRef = collection(db, "orders");
-        const q = query(ordersRef, where("userId", "==", user.uid));
+        const userOrders = await OrderService.getUserOrders(user.uid);
+        
+        const dashboardOrders: DashboardOrder[] = userOrders.map(order => ({
+          id: order.id,
+          orderId: order.orderId,
+          userId: order.userId,
+          status: order.status,
+          date: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(), // Use createdAt for date
+          total: `₦${(order.totalAmount || 0).toLocaleString()}`, // Format total
+          totalAmount: order.totalAmount,
+          products: Array.isArray(order.items) ? order.items.length : 1,
+          items: order.items,
+          createdAt: order.createdAt,
+          orderDate: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+          paymentMethod: order.paymentMethod,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          customerPhone: order.customerPhone,
+          bankDetails: order.bankDetails,
+          proofOfPayment: order.proofOfPayment,
+          paymentSubmittedAt: order.paymentSubmittedAt,
+          paymentVerifiedAt: order.paymentVerifiedAt,
+          transactionId: order.transactionId,
+          reference: order.reference,
+          paymentStatus: order.paymentStatus
+        }));
 
-        const querySnapshot = await getDocs(q);
-        const userOrders: Order[] = [];
-
-        querySnapshot.forEach((doc) => {
-          const orderData = doc.data();
-          userOrders.push({
-            id: doc.id,
-            ...orderData,
-          } as Order);
-        });
-
-        // 🔧 Sort orders by date in JavaScript instead of Firestore
-        userOrders.sort((a, b) => {
-          if (a.createdAt && b.createdAt) {
-            return b.createdAt.toDate() - a.createdAt.toDate();
-          }
-          return 0;
-        });
-
-        setOrders(userOrders);
+        console.log("📦 Orders converted:", dashboardOrders.length);
+        setOrders(dashboardOrders);
       } catch (error) {
         console.error("Error fetching orders:", error);
         setOrders([]);
@@ -416,12 +594,14 @@ const UserDashboard = () => {
       }
     };
 
-    if (user && userData) {
+    if (user && userData && user.uid) {
       fetchOrders();
+    } else {
+      setOrdersLoading(false);
     }
   }, [user, userData]);
 
-  // 🔧 FIXED: Handle input changes (this was working before)
+  // 🔧 Handle input changes
   const handleInputChange = (field: keyof FormData, value: string) => {
     console.log(`🔍 Updating ${field} to:`, value);
     setFormData((prev) => ({
@@ -440,13 +620,12 @@ const UserDashboard = () => {
   // 💾 SAVE PROFILE CHANGES TO FIREBASE
   const handleSaveChanges = async (): Promise<void> => {
     if (!user || !userData) {
-      alert("User not authenticated");
+      setAlertDialog({ message: "User not authenticated", visible: true });
       return;
     }
 
-    // Check if updateProfile function is available
     if (!updateProfile) {
-      alert("Profile update function not available. Please refresh the page.");
+      setAlertDialog({ message: "Profile update function not available. Please refresh the page.", visible: true });
       return;
     }
 
@@ -461,10 +640,10 @@ const UserDashboard = () => {
         zipCode: formData.zipCode,
       });
 
-      alert("Profile updated successfully!");
+      setAlertDialog({ message: "Profile updated successfully!", visible: true });
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile. Please try again.");
+      setAlertDialog({ message: "Failed to update profile. Please try again.", visible: true });
     } finally {
       setSaving(false);
     }
@@ -473,23 +652,22 @@ const UserDashboard = () => {
   // 🔒 CHANGE PASSWORD IN FIREBASE AUTH
   const handleChangePassword = async (): Promise<void> => {
     if (formData.newPassword !== formData.confirmPassword) {
-      alert("New passwords do not match!");
+      setAlertDialog({ message: "New passwords do not match!", visible: true });
       return;
     }
 
     if (formData.newPassword.length < 8) {
-      alert("Password must be at least 8 characters long!");
+      setAlertDialog({ message: "Password must be at least 8 characters long!", visible: true });
       return;
     }
 
     if (!formData.currentPassword) {
-      alert("Please enter your current password");
+      setAlertDialog({ message: "Please enter your current password", visible: true });
       return;
     }
 
-    // Check if changePassword function is available
     if (!changePassword) {
-      alert("Change password function not available. Please refresh the page.");
+      setAlertDialog({ message: "Change password function not available. Please refresh the page.", visible: true });
       return;
     }
 
@@ -497,7 +675,6 @@ const UserDashboard = () => {
     try {
       await changePassword(formData.currentPassword, formData.newPassword);
 
-      // Clear password fields
       setFormData((prev) => ({
         ...prev,
         currentPassword: "",
@@ -505,9 +682,9 @@ const UserDashboard = () => {
         confirmPassword: "",
       }));
 
-      alert("Password changed successfully!");
+      setAlertDialog({ message: "Password changed successfully!", visible: true });
     } catch (error: any) {
-      alert(error.message || "Failed to change password. Please try again.");
+      setAlertDialog({ message: error.message || "Failed to change password. Please try again.", visible: true });
     } finally {
       setChangingPassword(false);
     }
@@ -516,7 +693,7 @@ const UserDashboard = () => {
   // 🚪 LOGOUT FUNCTION
   const handleLogout = async () => {
     if (!signOut) {
-      alert("Logout function not available. Please refresh the page.");
+      setAlertDialog({ message: "Logout function not available. Please refresh the page.", visible: true });
       return;
     }
 
@@ -525,70 +702,111 @@ const UserDashboard = () => {
       router.push("/");
     } catch (error) {
       console.error("Error signing out:", error);
-      alert("Failed to log out. Please try again.");
+      setAlertDialog({ message: "Failed to log out. Please try again.", visible: true });
     }
   };
 
   // 📦 TRACK ORDER FUNCTION
   const handleTrackOrder = async (): Promise<void> => {
     if (!trackingForm.orderId.trim() || !trackingForm.billingEmail.trim()) {
-      alert("Please fill in both Order ID and Billing Email");
+      setAlertDialog({ message: "Please fill in both Order ID and Billing Email", visible: true });
       return;
     }
 
-    // Check if order exists in user's orders
-    const foundOrder = orders.find(
-      (order) =>
-        order.id.includes(trackingForm.orderId) &&
-        formData.email.toLowerCase() === trackingForm.billingEmail.toLowerCase()
-    );
-
-    if (!foundOrder) {
-      alert("Order not found. Please check your Order ID and billing email.");
+    if (!user || !user.uid) {
+      setAlertDialog({ message: "Please log in to track your orders", visible: true });
       return;
     }
 
-    // Mock tracking data - replace with real tracking API
-    const mockTrackingData: TrackingData = {
-      orderId: foundOrder.id,
-      products: foundOrder.products,
-      orderDate: foundOrder.date,
-      expectedDate: "23 Jan, 2021",
-      total: foundOrder.total,
-      currentStage:
-        foundOrder.status === "COMPLETED"
-          ? 3
-          : foundOrder.status === "IN PROGRESS"
-          ? 2
-          : 1,
-      activities: [
-        {
-          message:
-            foundOrder.status === "COMPLETED"
-              ? "Your order has been delivered. Thank you for shopping!"
-              : "Your order is being processed",
-          date: foundOrder.date,
-          type: foundOrder.status === "COMPLETED" ? "delivered" : "confirmed",
-        },
-      ],
-    };
-    setTrackingData(mockTrackingData);
+    try {
+      console.log("🔍 Tracking order:", trackingForm.orderId);
+
+      const orderResult = await OrderService.getOrderForTracking(trackingForm.orderId);
+      
+      if (!orderResult.success || !orderResult.order) {
+        setAlertDialog({ message: "Order not found. Please check your Order ID and billing email.", visible: true });
+        return;
+      }
+
+      const order = orderResult.order;
+      
+      if (order.customerEmail && order.customerEmail.toLowerCase() !== trackingForm.billingEmail.toLowerCase()) {
+        setAlertDialog({ message: "Order not found. Please check your Order ID and billing email.", visible: true });
+        return;
+      }
+
+      const dashboardOrder: DashboardOrder = {
+        id: order.id,
+        orderId: order.orderId,
+        userId: order.userId,
+        status: order.status,
+        date: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+        total: `₦${(order.totalAmount || 0).toLocaleString()}`,
+        totalAmount: order.totalAmount,
+        products: Array.isArray(order.items) ? order.items.length : 1,
+        items: order.items,
+        createdAt: order.createdAt,
+        orderDate: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+        paymentMethod: order.paymentMethod,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        bankDetails: order.bankDetails,
+        proofOfPayment: order.proofOfPayment,
+        paymentSubmittedAt: order.paymentSubmittedAt,
+        paymentVerifiedAt: order.paymentVerifiedAt,
+        transactionId: order.transactionId,
+        reference: order.reference,
+        paymentStatus: order.paymentStatus,
+      };
+
+      const enhancedTrackingData: TrackingData = {
+        orderId: dashboardOrder.orderId || dashboardOrder.id,
+        products: Array.isArray(dashboardOrder.items) ? dashboardOrder.items.length : 1,
+        orderDate: dashboardOrder.orderDate || new Date().toLocaleDateString(),
+        expectedDate: calculateExpectedDelivery(dashboardOrder),
+        total: dashboardOrder.total,
+        currentStage: getOrderStage(dashboardOrder.status, dashboardOrder.paymentMethod),
+        activities: generateOrderActivities(dashboardOrder),
+        paymentMethod: dashboardOrder.paymentMethod,
+        status: dashboardOrder.status,
+        bankDetails: dashboardOrder.bankDetails,
+        proofSubmitted: !!dashboardOrder.proofOfPayment,
+        transactionId: dashboardOrder.transactionId,
+        reference: dashboardOrder.reference,
+      };
+      
+      console.log("✅ Tracking data created:", enhancedTrackingData);
+      setTrackingData(enhancedTrackingData);
+      
+    } catch (error) {
+      console.error("Error tracking order:", error);
+      setAlertDialog({ message: "Failed to track order. Please try again.", visible: true });
+    }
   };
 
   const getStatusColor = (status: string): string => {
-    switch (status) {
+    switch (status.toUpperCase()) { // Ensure status is uppercase for consistent matching
       case "COMPLETED":
+      case "DELIVERED":
+      case "CONFIRMED":
+      case "PAYMENT_VERIFIED":
         return "text-green-600 bg-green-50";
       case "IN PROGRESS":
+      case "PROCESSING":
+      case "SHIPPED":
+      case "PAYMENT_SUBMITTED":
         return "text-orange-600 bg-orange-50";
       case "CANCELLED":
+      case "PENDING_PAYMENT":
+      case "PAYMENT_FAILED":
         return "text-red-600 bg-red-50";
       default:
         return "text-gray-600 bg-gray-50";
     }
   };
 
-  const handleViewDetails = (order: Order): void => {
+  const handleViewDetails = (order: DashboardOrder): void => {
     setSelectedOrder(order);
     setShowOrderDetails(true);
   };
@@ -600,7 +818,7 @@ const UserDashboard = () => {
     { id: "logout", label: "Log-out", icon: LogOut },
   ];
 
-  // 🔄 LOADING STATE - Show spinner while checking auth (same as WishlistPage)
+  // 🔄 LOADING STATE
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -612,7 +830,7 @@ const UserDashboard = () => {
     );
   }
 
-  // 🚫 If not authenticated or no user data, don't render anything (will redirect)
+  // 🚫 If not authenticated
   if (!user || (user && userData === null && !authLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -643,16 +861,12 @@ const UserDashboard = () => {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-600">Order ID:</span>
-              <span className="font-medium">{selectedOrder.id}</span>
+              <span className="font-medium">{selectedOrder.orderId || selectedOrder.id}</span>
             </div>
 
             <div className="flex justify-between">
               <span className="text-gray-600">Status:</span>
-              <span
-                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                  selectedOrder.status
-                )}`}
-              >
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
                 {selectedOrder.status}
               </span>
             </div>
@@ -667,17 +881,30 @@ const UserDashboard = () => {
               <span className="font-bold text-lg">{selectedOrder.total}</span>
             </div>
 
+            {selectedOrder.paymentMethod && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Payment Method:</span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  selectedOrder.paymentMethod === 'flutterwave' 
+                    ? 'bg-orange-100 text-orange-800' 
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {selectedOrder.paymentMethod === 'flutterwave' ? 'Flutterwave' : 'Bank Transfer'}
+                </span>
+              </div>
+            )}
+
             <div className="pt-3 border-t">
               <span className="text-gray-600 block mb-2">Items:</span>
               <ul className="list-disc list-inside space-y-1">
-                {selectedOrder.items?.map((item, index) => (
-                  <li key={index} className="text-sm text-gray-700">
-                    {item}
-                  </li>
-                )) || (
-                  <li className="text-sm text-gray-500">
-                    Order items not available
-                  </li>
+                {selectedOrder.items?.length > 0 ? (
+                  selectedOrder.items.map((item, index) => (
+                    <li key={index} className="text-sm text-gray-700">
+                      {typeof item === 'string' ? item : item.itemName || 'Product'}
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-gray-500">Order items not available</li>
                 )}
               </ul>
             </div>
@@ -690,49 +917,43 @@ const UserDashboard = () => {
             >
               Close
             </button>
-            {selectedOrder.status === "IN PROGRESS" && (
-              <button
-                onClick={() => {
-                  setShowOrderDetails(false);
-                  setActiveTab("track-order");
-                  setTrackingForm({
-                    orderId: selectedOrder.id,
-                    billingEmail: formData.email,
-                  });
-                }}
-                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-              >
-                Track Order
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setShowOrderDetails(false);
+                setActiveTab("track-order");
+                setTrackingForm({
+                  orderId: selectedOrder.orderId || selectedOrder.id,
+                  billingEmail: formData.email,
+                });
+              }}
+              className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              Track Order
+            </button>
           </div>
         </div>
       </div>
     );
   };
 
-const ProfileTab = () => {
-    // Local state for immediate editing (won't be affected by AuthContext re-renders)
+  const ProfileTab = () => {
     const [localFormData, setLocalFormData] = useState({
       fullName: "",
       username: "",
       phone: "",
       country: "Nigeria",
       state: "Lagos",
-      zipCode: ""
+      zipCode: "",
     });
 
-    // Track if local state has been initialized (using ref to prevent re-initialization)
     const localInitializedRef = useRef(false);
 
-    // Add local state for password fields too
     const [passwordData, setPasswordData] = useState({
       currentPassword: "",
       newPassword: "",
-      confirmPassword: ""
+      confirmPassword: "",
     });
 
-    // Initialize local state ONCE when formData is ready
     useEffect(() => {
       if (formData && formInitialized && !localInitializedRef.current) {
         setLocalFormData({
@@ -741,21 +962,20 @@ const ProfileTab = () => {
           phone: formData.phone || "",
           country: formData.country || "Nigeria",
           state: formData.state || "Lagos",
-          zipCode: formData.zipCode || ""
+          zipCode: formData.zipCode || "",
         });
         localInitializedRef.current = true;
       }
     }, [formData, formInitialized]);
 
-    // Enhanced save function that uses local state
-    const handleSaveChanges = async () => {
+    const handleLocalSaveChanges = async () => {
       if (!user || !userData) {
-        alert("User not authenticated");
+        setAlertDialog({ message: "User not authenticated", visible: true });
         return;
       }
 
       if (!updateProfile) {
-        alert("Profile update function not available. Please refresh the page.");
+        setAlertDialog({ message: "Profile update function not available. Please refresh the page.", visible: true });
         return;
       }
 
@@ -770,40 +990,38 @@ const ProfileTab = () => {
           zipCode: localFormData.zipCode,
         });
 
-        // Update main formData to match local state
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          ...localFormData
+          ...localFormData,
         }));
 
-        alert("Profile updated successfully!");
+        setAlertDialog({ message: "Profile updated successfully!", visible: true });
       } catch (error) {
         console.error("Error updating profile:", error);
-        alert("Failed to update profile. Please try again.");
+        setAlertDialog({ message: "Failed to update profile. Please try again.", visible: true });
       } finally {
         setSaving(false);
       }
     };
 
-    // Update the password change handler to use local password state
-    const handleChangePassword = async () => {
+    const handleLocalChangePassword = async () => {
       if (passwordData.newPassword !== passwordData.confirmPassword) {
-        alert("New passwords do not match!");
+        setAlertDialog({ message: "New passwords do not match!", visible: true });
         return;
       }
 
       if (passwordData.newPassword.length < 8) {
-        alert("Password must be at least 8 characters long!");
+        setAlertDialog({ message: "Password must be at least 8 characters long!", visible: true });
         return;
       }
 
       if (!passwordData.currentPassword) {
-        alert("Please enter your current password");
+        setAlertDialog({ message: "Please enter your current password", visible: true });
         return;
       }
 
       if (!changePassword) {
-        alert("Change password function not available. Please refresh the page.");
+        setAlertDialog({ message: "Change password function not available. Please refresh the page.", visible: true });
         return;
       }
 
@@ -811,71 +1029,56 @@ const ProfileTab = () => {
       try {
         await changePassword(passwordData.currentPassword, passwordData.newPassword);
 
-        // Clear password fields
         setPasswordData({
           currentPassword: "",
           newPassword: "",
-          confirmPassword: ""
+          confirmPassword: "",
         });
 
-        alert("Password changed successfully!");
+        setAlertDialog({ message: "Password changed successfully!", visible: true });
       } catch (error: any) {
-        alert(error.message || "Failed to change password. Please try again.");
+        setAlertDialog({ message: error.message || "Failed to change password. Please try again.", visible: true });
       } finally {
         setChangingPassword(false);
       }
     };
-    
+
     return (
       <div className="bg-white rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">ACCOUNT SETTING</h2>
 
-          {/* Session Status Display */}
-          {getRemainingTime &&
-            (() => {
-              const remaining = getRemainingTime();
-              const minutes = Math.floor(remaining / (60 * 1000));
-              const hours = Math.floor(minutes / 60);
-              const displayMinutes = minutes % 60;
-              const showWarning = remaining < 10 * 60 * 1000 && remaining > 0;
+          {getRemainingTime && (() => {
+            const remaining = getRemainingTime();
+            const showWarning = remaining < 10 * 60 * 1000 && remaining > 0;
 
-              if (remaining <= 0) return null;
+            if (remaining <= 0) return null;
 
-              return (
-                <div
-                  className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
-                    showWarning
-                      ? "bg-red-100 text-red-700 border border-red-200"
-                      : "bg-green-100 text-green-700 border border-green-200"
-                  }`}
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      showWarning ? "bg-red-500 animate-pulse" : "bg-green-500"
-                    }`}
-                  ></div>
-                  <span>
-                    Session:{" "}
-                    {hours > 0 ? `${hours}h ${displayMinutes}m` : `${minutes}m`}
-                  </span>
-                  {showWarning && extendSession && (
-                    <button
-                      onClick={extendSession}
-                      className="ml-1 px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
-                    >
-                      Extend
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
+            return (
+              <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
+                showWarning
+                  ? "bg-red-100 text-red-700 border border-red-200"
+                  : "bg-green-100 text-green-700 border border-green-200"
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  showWarning ? "bg-red-500 animate-pulse" : "bg-green-500"
+                }`}></div>
+                <span>In Session</span>
+                {showWarning && extendSession && (
+                  <button
+                    onClick={extendSession}
+                    className="ml-1 px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
+                  >
+                    Extend
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="space-y-8">
-          {/* Profile Picture & Basic Info */}
           <div className="flex flex-col sm:flex-row gap-6">
-            {/* Profile Picture */}
             <div className="flex-shrink-0">
               <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center">
                 {userData?.profilePicture ? (
@@ -890,7 +1093,6 @@ const ProfileTab = () => {
               </div>
             </div>
 
-            {/* Form Fields - Using LOCAL STATE for smooth editing */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -900,9 +1102,9 @@ const ProfileTab = () => {
                   type="text"
                   value={localFormData.fullName}
                   onChange={(e) => {
-                    setLocalFormData(prev => ({
+                    setLocalFormData((prev) => ({
                       ...prev,
-                      fullName: e.target.value
+                      fullName: e.target.value,
                     }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -918,9 +1120,9 @@ const ProfileTab = () => {
                   type="text"
                   value={localFormData.username}
                   onChange={(e) => {
-                    setLocalFormData(prev => ({
+                    setLocalFormData((prev) => ({
                       ...prev,
-                      username: e.target.value
+                      username: e.target.value,
                     }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -930,14 +1132,13 @@ const ProfileTab = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email
+                  Email Address
                 </label>
                 <input
                   type="email"
-                  value={formData.email || ""}
+                  value={formData.email} // Email from main formData as it's from auth
                   disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                  title="Email cannot be changed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
                 />
               </div>
 
@@ -949,9 +1150,9 @@ const ProfileTab = () => {
                   type="tel"
                   value={localFormData.phone}
                   onChange={(e) => {
-                    setLocalFormData(prev => ({
+                    setLocalFormData((prev) => ({
                       ...prev,
-                      phone: e.target.value
+                      phone: e.target.value,
                     }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -961,395 +1162,274 @@ const ProfileTab = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Country/Region
+                  Country
                 </label>
                 <select
                   value={localFormData.country}
                   onChange={(e) => {
-                    setLocalFormData(prev => ({
+                    setLocalFormData((prev) => ({
                       ...prev,
-                      country: e.target.value
+                      country: e.target.value,
                     }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 >
                   <option value="Nigeria">Nigeria</option>
+                  {/* Add more countries if needed */}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    State
-                  </label>
-                  <select
-                    value={localFormData.state}
-                    onChange={(e) => {
-                      setLocalFormData(prev => ({
-                        ...prev,
-                        state: e.target.value
-                      }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  >
-                    {nigerianStates.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  State
+                </label>
+                <select
+                  value={localFormData.state}
+                  onChange={(e) => {
+                    setLocalFormData((prev) => ({
+                      ...prev,
+                      state: e.target.value,
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                >
+                  {nigerianStates.map((state) => (
+                    <option key={state} value={state}>
+                      {state}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Zip Code
-                  </label>
-                  <input
-                    type="text"
-                    value={localFormData.zipCode}
-                    onChange={(e) => {
-                      setLocalFormData(prev => ({
-                        ...prev,
-                        zipCode: e.target.value
-                      }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="Enter zip code"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Zip Code
+                </label>
+                <input
+                  type="text"
+                  value={localFormData.zipCode}
+                  onChange={(e) => {
+                    setLocalFormData((prev) => ({
+                      ...prev,
+                      zipCode: e.target.value,
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  placeholder="Enter your zip code"
+                />
               </div>
             </div>
           </div>
 
           <button
-            onClick={handleSaveChanges}
-            disabled={saving || !updateProfile}
-            className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleLocalSaveChanges}
+            disabled={saving}
+            className={`w-full py-3 rounded-lg text-white font-semibold transition-colors ${
+              saving
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-red-500 hover:bg-red-600"
+            }`}
           >
-            {saving ? "SAVING..." : "SAVE CHANGES"}
+            {saving ? "Saving..." : "Save Changes"}
           </button>
 
-          {/* Change Password Section - Using LOCAL PASSWORD STATE */}
-          <div className="border-t pt-8">
-            <h3 className="text-lg font-bold mb-6">CHANGE PASSWORD</h3>
-
-            <div className="space-y-4 max-w-md">
-              <div>
+          {/* Password Change Section */}
+          <div className="pt-8 border-t border-gray-200">
+            <h3 className="text-lg font-bold mb-4">Change Password</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Password
                 </label>
-                <div className="relative">
-                  <input
-                    type={showPasswords.current ? "text" : "password"}
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData(prev => ({
-                      ...prev, 
-                      currentPassword: e.target.value
-                    }))}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="Enter current password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => togglePasswordVisibility("current")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                  >
-                    {showPasswords.current ? (
-                      <EyeOff size={20} />
-                    ) : (
-                      <Eye size={20} />
-                    )}
-                  </button>
-                </div>
+                <input
+                  type={showPasswords.current ? "text" : "password"}
+                  value={passwordData.currentPassword}
+                  onChange={(e) =>
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      currentPassword: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent pr-10"
+                  placeholder="Enter current password"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility("current")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 mt-7"
+                >
+                  {showPasswords.current ? <EyeOff /> : <Eye />}
+                </button>
               </div>
-
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   New Password
                 </label>
-                <div className="relative">
-                  <input
-                    type={showPasswords.new ? "text" : "password"}
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData(prev => ({
-                      ...prev, 
-                      newPassword: e.target.value
-                    }))}
-                    placeholder="8+ characters"
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => togglePasswordVisibility("new")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                  >
-                    {showPasswords.new ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
+                <input
+                  type={showPasswords.new ? "text" : "password"}
+                  value={passwordData.newPassword}
+                  onChange={(e) =>
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      newPassword: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent pr-10"
+                  placeholder="Enter new password"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility("new")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 mt-7"
+                >
+                  {showPasswords.new ? <EyeOff /> : <Eye />}
+                </button>
               </div>
-
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Confirm Password
+                  Confirm New Password
                 </label>
-                <div className="relative">
-                  <input
-                    type={showPasswords.confirm ? "text" : "password"}
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData(prev => ({
-                      ...prev, 
-                      confirmPassword: e.target.value
-                    }))}
-                    placeholder="Confirm new password"
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => togglePasswordVisibility("confirm")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                  >
-                    {showPasswords.confirm ? (
-                      <EyeOff size={20} />
-                    ) : (
-                      <Eye size={20} />
-                    )}
-                  </button>
-                </div>
+                <input
+                  type={showPasswords.confirm ? "text" : "password"}
+                  value={passwordData.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      confirmPassword: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent pr-10"
+                  placeholder="Confirm new password"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility("confirm")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 mt-7"
+                >
+                  {showPasswords.confirm ? <EyeOff /> : <Eye />}
+                </button>
               </div>
-
-              <button
-                onClick={handleChangePassword}
-                disabled={changingPassword || !changePassword}
-                className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {changingPassword ? "CHANGING..." : "CHANGE PASSWORD"}
-              </button>
             </div>
+            <button
+              onClick={handleLocalChangePassword}
+              disabled={changingPassword}
+              className={`mt-6 w-full py-3 rounded-lg text-white font-semibold transition-colors ${
+                changingPassword
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-red-500 hover:bg-red-600"
+              }`}
+            >
+              {changingPassword ? "Changing Password..." : "Change Password"}
+            </button>
           </div>
         </div>
       </div>
     );
   };
-  
 
   const TrackOrderTab = () => (
     <div className="bg-white rounded-lg p-6">
-      <h2 className="text-xl font-semibold mb-6">Track Order</h2>
-
-      {!trackingData ? (
-        <div className="space-y-6">
-          <p className="text-gray-600">
-            To track your order please enter your order ID in the input field
-            below and press the "Track Order" button. this was given to you on
-            your receipt and in the confirmation email you should have received.
-          </p>
-
-          <div className="space-y-4 max-w-md">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Order ID
-              </label>
-              <input
-                type="text"
-                value={trackingForm.orderId}
-                onChange={(e) =>
-                  setTrackingForm((prev) => ({
-                    ...prev,
-                    orderId: e.target.value,
-                  }))
-                }
-                placeholder="Order ID"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Billing Email
-              </label>
-              <input
-                type="email"
-                value={trackingForm.billingEmail}
-                onChange={(e) =>
-                  setTrackingForm((prev) => ({
-                    ...prev,
-                    billingEmail: e.target.value,
-                  }))
-                }
-                placeholder="Email address"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="flex items-center text-sm text-gray-600">
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Order ID that we emailed to you in your email database.
-            </div>
-
-            <button
-              onClick={handleTrackOrder}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center gap-2"
-            >
-              TRACK ORDER →
-            </button>
-          </div>
+      <h2 className="text-xl font-bold mb-6">TRACK YOUR ORDER</h2>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Order ID
+          </label>
+          <input
+            type="text"
+            value={trackingForm.orderId}
+            onChange={(e) =>
+              setTrackingForm((prev) => ({ ...prev, orderId: e.target.value }))
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            placeholder="Enter your Order ID"
+          />
         </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Back Button */}
-          <button
-            onClick={() => setTrackingData(null)}
-            className="text-red-500 hover:text-red-600 font-medium flex items-center gap-2 mb-4"
-          >
-            ← Back to Track Order
-          </button>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Billing Email
+          </label>
+          <input
+            type="email"
+            value={trackingForm.billingEmail}
+            onChange={(e) =>
+              setTrackingForm((prev) => ({
+                ...prev,
+                billingEmail: e.target.value,
+              }))
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            placeholder="Enter your billing email"
+          />
+        </div>
+        <button
+          onClick={handleTrackOrder}
+          className="w-full py-3 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+        >
+          Track Order
+        </button>
+      </div>
 
-          {/* Order Info Header */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      {trackingData && (
+        <div className="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
+          <h3 className="text-lg font-bold mb-4">Order Tracking Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
+            <div>
+              <p className="text-gray-600">Order ID:</p>
+              <p className="font-medium">{trackingData.orderId}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Items:</p>
+              <p className="font-medium">{trackingData.products} products</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Order Date:</p>
+              <p className="font-medium">{trackingData.orderDate}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Expected Delivery:</p>
+              <p className="font-medium">{trackingData.expectedDate}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Total:</p>
+              <p className="font-bold text-lg">{trackingData.total}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Payment Method:</p>
+              <p className="font-medium capitalize">{trackingData.paymentMethod?.replace('_', ' ')}</p>
+            </div>
+            {trackingData.transactionId && (
               <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  {trackingData.orderId}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {trackingData.products} Products • Order Placed on{" "}
-                  {trackingData.orderDate}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Order expected on{" "}
-                  <span className="font-medium">
-                    {trackingData.expectedDate}
-                  </span>
-                </p>
+                <p className="text-gray-600">Transaction ID:</p>
+                <p className="font-medium">{trackingData.transactionId}</p>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-blue-600">
-                  {trackingData.total}
-                </p>
+            )}
+            {trackingData.reference && (
+              <div>
+                <p className="text-gray-600">Reference:</p>
+                <p className="font-medium">{trackingData.reference}</p>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Progress Tracker */}
-          <div className="bg-gray-50 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-8 relative">
-              {/* Progress Line Background */}
-              <div className="absolute top-4 left-4 right-4 h-0.5 bg-gray-300"></div>
-              <div
-                className="absolute top-4 left-4 h-0.5 bg-green-500 transition-all duration-500"
-                style={{
-                  width: `${Math.max(
-                    0,
-                    (trackingData.currentStage / 3) * (100 - 8)
-                  )}%`,
-                }}
-              ></div>
-
-              {[
-                {
-                  label: "Order Placed",
-                  completed: trackingData.currentStage >= 0,
-                  current: trackingData.currentStage === 0,
-                },
-                {
-                  label: "Packaging",
-                  completed: trackingData.currentStage >= 1,
-                  current: trackingData.currentStage === 1,
-                },
-                {
-                  label: "On the Road",
-                  completed: trackingData.currentStage >= 2,
-                  current: trackingData.currentStage === 2,
-                },
-                {
-                  label: "Delivered",
-                  completed: trackingData.currentStage >= 3,
-                  current: trackingData.currentStage === 3,
-                },
-              ].map((stage, index) => (
-                <div
-                  key={index}
-                  className="flex flex-col items-center relative z-10"
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center mb-2 ${
-                      stage.completed
-                        ? "bg-green-500 border-green-500 text-white"
-                        : stage.current
-                        ? "bg-orange-500 border-orange-500 text-white"
-                        : "bg-white border-gray-300 text-gray-400"
-                    }`}
-                  >
-                    {stage.completed ? (
-                      <svg
-                        className="w-5 h-5"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    ) : stage.current ? (
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                    ) : (
-                      <div className="w-2 h-2 border border-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span
-                    className={`text-xs text-center ${
-                      stage.completed || stage.current
-                        ? "text-gray-900 font-medium"
-                        : "text-gray-400"
-                    }`}
-                  >
-                    {stage.label}
-                  </span>
+          <h4 className="font-semibold text-gray-700 mb-3">Order Progress:</h4>
+          <div className="relative flex flex-col items-start space-y-4">
+            {trackingData.activities.map((activity, index) => (
+              <div key={index} className="flex items-start w-full">
+                <div className="flex flex-col items-center mr-4">
+                  <div className={`w-4 h-4 rounded-full ${activity.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  {index < trackingData.activities.length - 1 && (
+                    <div className={`w-0.5 flex-grow ${activity.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Order Activity */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Order Activity</h3>
-            <div className="space-y-4">
-              {trackingData.activities.map((activity, index) => (
-                <div key={index} className="flex gap-3">
-                  <div
-                    className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
-                      activity.type === "delivered"
-                        ? "bg-green-500"
-                        : activity.type === "pickup"
-                        ? "bg-blue-500"
-                        : activity.type === "hub"
-                        ? "bg-blue-400"
-                        : activity.type === "transit"
-                        ? "bg-orange-500"
-                        : activity.type === "verified"
-                        ? "bg-green-400"
-                        : "bg-gray-400"
-                    }`}
-                  ></div>
-                  <div>
-                    <p className="text-gray-900 text-sm">{activity.message}</p>
-                    <p className="text-gray-500 text-xs">{activity.date}</p>
-                  </div>
+                <div className="flex-1 pb-4">
+                  <p className={`font-medium ${activity.completed ? 'text-gray-800' : 'text-gray-500'}`}>
+                    {activity.message}
+                  </p>
+                  <p className="text-xs text-gray-400">{activity.date}</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -1357,77 +1437,69 @@ const ProfileTab = () => {
   );
 
   const OrderHistoryTab = () => (
-    <div className="bg-white rounded-lg overflow-hidden">
-      <div className="p-6 border-b">
-        <h2 className="text-xl font-semibold">Order History</h2>
-      </div>
-
+    <div className="bg-white rounded-lg p-6">
+      <h2 className="text-xl font-bold mb-6">ORDER HISTORY</h2>
       {ordersLoading ? (
-        <div className="p-6 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading orders...</p>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your orders...</p>
         </div>
       ) : orders.length === 0 ? (
-        <div className="p-6 text-center">
-          <Package size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No Orders Yet
-          </h3>
-          <p className="text-gray-500">
-            You haven't placed any orders yet. Start shopping to see your order
-            history here!
-          </p>
+        <div className="text-center py-8 text-gray-500">
+          <p>You haven't placed any orders yet.</p>
+          <p className="mt-2">Start shopping to see your order history here!</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="text-left py-3 px-6 font-medium text-gray-700">
-                  ORDER ID
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Order ID
                 </th>
-                <th className="text-left py-3 px-6 font-medium text-gray-700">
-                  STATUS
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
                 </th>
-                <th className="text-left py-3 px-6 font-medium text-gray-700">
-                  DATE
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
                 </th>
-                <th className="text-left py-3 px-6 font-medium text-gray-700">
-                  TOTAL
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Products
                 </th>
-                <th className="text-left py-3 px-6 font-medium text-gray-700">
-                  ACTION
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" className="relative px-6 py-3">
+                  <span className="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white divide-y divide-gray-200">
               {orders.map((order) => (
-                <tr
-                  key={order.id}
-                  className="border-b border-gray-100 hover:bg-gray-50"
-                >
-                  <td className="py-4 px-6 font-medium text-gray-900">
-                    #{order.id.substring(0, 8)}
+                <tr key={order.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {order.orderId || order.id.substring(0, 8)}...
                   </td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        order.status
-                      )}`}
-                    >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {order.date}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {order.total}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {order.products}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
                       {order.status}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-gray-600">{order.date}</td>
-                  <td className="py-4 px-6 font-medium">
-                    {order.total} ({order.products} Products)
-                  </td>
-                  <td className="py-4 px-6">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => handleViewDetails(order)}
-                      className="flex items-center gap-1 text-orange-500 hover:text-orange-600 font-medium transition-colors"
+                      className="text-red-600 hover:text-red-900 ml-4"
                     >
-                      View Details <Eye size={16} />
+                      View Details
                     </button>
                   </td>
                 </tr>
@@ -1440,103 +1512,74 @@ const ProfileTab = () => {
   );
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <Header />
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-[1400px] mx-auto py-6 px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Desktop Sidebar */}
-            <div className="hidden lg:block lg:col-span-1">
-              <div className="bg-white rounded-lg overflow-hidden">
-                {menuItems.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => {
-                      if (id === "logout") {
-                        handleLogout();
-                      } else {
-                        setActiveTab(id);
-                      }
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-4 transition-colors text-left border-b border-gray-100 last:border-b-0 ${
-                      activeTab === id
-                        ? "bg-red-500 text-white"
-                        : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    <Icon size={20} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <main className="flex-1 container mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Mobile Menu Toggle */}
+          <div className="lg:hidden mb-4">
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="p-2 border border-gray-300 rounded-lg flex items-center justify-between w-full bg-white text-gray-700"
+            >
+              <span>{menuItems.find(item => item.id === activeTab)?.label || 'Menu'}</span>
+              {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
 
-            {/* Mobile Navigation Dropdown */}
-            <div className="lg:hidden mb-4">
-              <div className="relative">
-                <button
-                  onClick={() => setShowMobileMenu(!showMobileMenu)}
-                  className="w-full bg-white p-4 rounded-lg flex items-center justify-between text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    {(() => {
-                      const activeMenuItem = menuItems.find(
-                        (item) => item.id === activeTab
-                      );
-                      const Icon = activeMenuItem?.icon || User;
-                      return (
-                        <>
-                          <Icon size={20} className="text-red-500" />
-                          <span className="font-medium">
-                            {activeMenuItem?.label || "Profile"}
-                          </span>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
-                </button>
-
-                {showMobileMenu && (
-                  <div className="absolute top-full left-0 right-0 bg-white rounded-lg mt-2 shadow-lg z-10">
-                    {menuItems.map(({ id, label, icon: Icon }) => (
-                      <button
-                        key={id}
-                        onClick={() => {
-                          if (id === "logout") {
-                            handleLogout();
-                          } else {
-                            setActiveTab(id);
-                          }
-                          setShowMobileMenu(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-4 transition-colors text-left border-b border-gray-100 last:border-b-0 ${
-                          activeTab === id
-                            ? "bg-red-50 text-red-600"
-                            : "text-gray-700 hover:bg-gray-50"
+          {/* Sidebar Navigation */}
+          <div
+            className={`w-full lg:w-1/4 bg-white rounded-lg p-6 shadow-md lg:block ${
+              showMobileMenu ? "block" : "hidden"
+            }`}
+          >
+            <nav>
+              <ul className="space-y-2">
+                {menuItems.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setShowMobileMenu(false); // Close menu on item click
+                        if (item.id === "logout") {
+                          handleLogout();
+                        }
+                      }}
+                      className={`flex items-center w-full px-4 py-3 rounded-lg text-left transition-colors duration-200 ${
+                        activeTab === item.id
+                          ? "bg-red-500 text-white shadow-md"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <item.icon
+                        className={`mr-3 ${
+                          activeTab === item.id ? "text-white" : "text-gray-500"
                         }`}
-                      >
-                        <Icon size={20} />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                      />
+                      <span className="font-medium">{item.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </div>
 
-            {/* Main Content */}
-            <div className="lg:col-span-3">
-              {activeTab === "profile" && <ProfileTab />}
-              {activeTab === "track-order" && <TrackOrderTab />}
-              {activeTab === "order-history" && <OrderHistoryTab />}
-            </div>
+          {/* Main Content Area */}
+          <div className="flex-1">
+            {activeTab === "profile" && <ProfileTab />}
+            {activeTab === "track-order" && <TrackOrderTab />}
+            {activeTab === "order-history" && <OrderHistoryTab />}
           </div>
         </div>
-      </div>
-
-      <OrderDetailsModal />
+      </main>
       <Footer />
+      {alertDialog.visible && (
+        <AlertDialog
+          message={alertDialog.message}
+          onClose={() => setAlertDialog({ ...alertDialog, visible: false })}
+        />
+      )}
+      <OrderDetailsModal />
     </div>
   );
 };

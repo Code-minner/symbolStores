@@ -1,4 +1,4 @@
-// src/app/cart/page.tsx
+// src/app/cart/page.tsx - Updated with centralized calculations
 "use client";
 
 import React from "react";
@@ -9,8 +9,14 @@ import Footer from "@/components/Footer";
 import { useCart } from "@/lib/CartContext";
 
 export default function CartPage() {
-  const { state, removeFromCart, updateQuantity, clearCart, formatPrice } =
-    useCart();
+  const { 
+    state, 
+    removeFromCart, 
+    updateQuantity, 
+    clearCart, 
+    formatPrice,
+    getShippingMessage 
+  } = useCart();
 
   const handleQuantityChange = (
     itemId: string,
@@ -296,7 +302,7 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Order Summary */}
+              {/* Order Summary - UPDATED with centralized calculations */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 sticky top-4">
                   <div className="p-6">
@@ -304,10 +310,22 @@ export default function CartPage() {
                       Order Summary
                     </h2>
 
+                    {/* Free Shipping Progress */}
+                    {!state.isFreeShipping && (
+                      <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-blue-800 font-medium">
+                          🚚 Free Shipping After Purchase Order of ₦990,000.00
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          {getShippingMessage()}
+                        </p>
+                      </div>
+                    )}
+
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">
-                          Subtotal ({state.totalItems} items)
+                          Cart Subtotal ({state.totalItems} items)
                         </span>
                         <span className="font-medium">
                           {formatPrice(state.totalAmount)}
@@ -315,22 +333,24 @@ export default function CartPage() {
                       </div>
 
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Shipping</span>
-                        <span className="font-medium text-green-600">Free</span>
+                        <span className="text-gray-600">Estimated tax</span>
+                        <span className="font-medium">
+                          {formatPrice(state.taxAmount)}
+                        </span>
                       </div>
 
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Tax (VAT)</span>
-                        <span className="font-medium">
-                          Calculated at checkout
+                        <span className="text-gray-600">Shipping</span>
+                        <span className={`font-medium ${state.isFreeShipping ? "text-green-600" : ""}`}>
+                          {state.isFreeShipping ? "Free" : formatPrice(state.shippingCost)}
                         </span>
                       </div>
 
                       <div className="border-t border-gray-200 pt-3">
                         <div className="flex justify-between text-lg font-semibold">
-                          <span>Total</span>
+                          <span>Order total</span>
                           <span className="text-red-600">
-                            {formatPrice(state.totalAmount)}
+                            {formatPrice(state.finalTotal)}
                           </span>
                         </div>
                       </div>
@@ -359,7 +379,7 @@ export default function CartPage() {
                         Benefits
                       </h3>
                       <ul className="text-xs text-gray-600 space-y-1">
-                        <li>✓ Free delivery on orders over ₦50,000</li>
+                        <li>✓ Free delivery on orders over ₦990,000</li>
                         <li>✓ 30-day return policy</li>
                         <li>✓ Secure payment options</li>
                         <li>✓ Customer support</li>

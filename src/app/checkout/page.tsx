@@ -1,16 +1,27 @@
-// src/app/checkout/page.tsx
+// src/app/checkout/page.tsx - Updated to use centralized cart logic
 "use client";
 
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { useCart } from "@/lib/CartContext";
+import { useCart, TAX_RATE } from "@/lib/CartContext";
+import { useReviewData, ReviewData } from "@/lib/hooks/useReviewData";
+
+// Define the payment method type
+type PaymentMethod = "flutterwave" | "bank" | "card";
 
 export default function CheckoutPage() {
+  // Now using the centralized cart state with all calculations
   const { state, formatPrice } = useCart();
-  const [selectedPayment, setSelectedPayment] = useState("card");
+  const router = useRouter();
+  const { saveReviewData } = useReviewData();
+
+  // Updated with proper type
+  const [selectedPayment, setSelectedPayment] =
+    useState<PaymentMethod>("flutterwave");
   const [shipToDifferent, setShipToDifferent] = useState(false);
 
   const [billingInfo, setBillingInfo] = useState({
@@ -54,9 +65,118 @@ export default function CheckoutPage() {
     }
   };
 
-  const shippingCost = 0; // Free shipping
-  const tax = 0; // Calculated at checkout
-  const totalAmount = state.totalAmount + shippingCost + tax;
+  // Form validation
+  const validateForm = () => {
+    const errors = [];
+
+    // Check required billing fields
+    if (!billingInfo.firstName.trim()) errors.push("First name is required");
+    if (!billingInfo.lastName.trim()) errors.push("Last name is required");
+    if (!billingInfo.address.trim()) errors.push("Address is required");
+    if (!billingInfo.email.trim()) errors.push("Email is required");
+    if (!billingInfo.phone.trim()) errors.push("Phone number is required");
+    if (!billingInfo.country) errors.push("Country is required");
+    if (!billingInfo.region) errors.push("Region/State is required");
+    if (!billingInfo.city) errors.push("City is required");
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (billingInfo.email && !emailRegex.test(billingInfo.email)) {
+      errors.push("Please enter a valid email address");
+    }
+
+    // Phone validation (basic)
+    const phoneRegex = /^[+]?[\d\s\-\(\)]{10,}$/;
+    if (billingInfo.phone && !phoneRegex.test(billingInfo.phone)) {
+      errors.push("Please enter a valid phone number");
+    }
+
+    return errors;
+  };
+
+  // Helper function to get payment type display
+  const getPaymentTypeDisplay = (method: PaymentMethod): string => {
+    switch (method) {
+      case "flutterwave":
+        return "Flutterwave Payment";
+      case "bank":
+        return "Bank Transfer";
+      case "card":
+        return "Credit/Debit Card";
+      default:
+        return "Selected Payment Method";
+    }
+  };
+
+  // Save data and proceed to review
+  const handleProceedToReview = () => {
+    const errors = validateForm();
+
+    if (errors.length > 0) {
+      alert("Please fix the following errors:\n\n" + errors.join("\n"));
+      return;
+    }
+
+    // Format address
+    const fullAddress = [
+      billingInfo.address,
+      billingInfo.city,
+      billingInfo.region,
+      billingInfo.country,
+      billingInfo.zipCode,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    // Format card display for security
+    const cardDisplay =
+      selectedPayment === "card" && cardInfo.cardNumber
+        ? cardInfo.cardNumber.replace(/\d(?=\d{4})/g, "*")
+        : "N/A";
+
+    // Prepare review data with values from centralized cart state
+    const reviewData: ReviewData = {
+      address: {
+        name: `${billingInfo.firstName} ${billingInfo.lastName}`,
+        fullAddress: fullAddress,
+        email: billingInfo.email,
+        phone: billingInfo.phone,
+        company: billingInfo.companyName || "",
+      },
+      payment: {
+        type: getPaymentTypeDisplay(selectedPayment),
+        name:
+          selectedPayment === "card"
+            ? cardInfo.nameOnCard
+            : `${billingInfo.firstName} ${billingInfo.lastName}`,
+        cardNumber: cardDisplay,
+        expiryDate: cardInfo.expiryDate || "N/A",
+        method: selectedPayment,
+      },
+      orderNotes: orderNotes,
+      billingInfo: billingInfo,
+      cardInfo: selectedPayment === "card" ? cardInfo : null,
+      // Using values from centralized cart state
+      subtotal: state.totalAmount, // Cart subtotal
+      shippingCost: state.shippingCost, // Calculated shipping
+      taxAmount: state.taxAmount, // Calculated tax
+      totalAmount: state.finalTotal, // Final total
+    };
+
+    // Save to hook/storage
+    saveReviewData(reviewData);
+
+    // Navigate to review page
+    router.push("/review");
+  };
+
+  // Handle payment method change with proper typing
+  const handlePaymentMethodChange = (method: string) => {
+    // Type guard to ensure only valid payment methods are set
+    if (method === "flutterwave" || method === "bank" || method === "card") {
+      setSelectedPayment(method);
+    }
+  };
 
   return (
     <div>
@@ -125,10 +245,13 @@ export default function CheckoutPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               Checkout
             </h1>
+            <p className="text-gray-600 mt-2">
+              Please fill in your details to complete your order
+            </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Checkout Form */}
+            {/* Checkout Form - Billing Information, Payment Methods, etc. */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="p-6">
@@ -143,7 +266,7 @@ export default function CheckoutPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            First name
+                            First name <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
@@ -157,11 +280,12 @@ export default function CheckoutPage() {
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="First name"
+                            required
                           />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Last name
+                            Last name <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
@@ -175,6 +299,7 @@ export default function CheckoutPage() {
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Last name"
+                            required
                           />
                         </div>
                       </div>
@@ -203,7 +328,7 @@ export default function CheckoutPage() {
                       {/* Address */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Address
+                          Address <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -217,6 +342,7 @@ export default function CheckoutPage() {
                           }
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           placeholder="House number and street name"
+                          required
                         />
                       </div>
 
@@ -224,7 +350,7 @@ export default function CheckoutPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Country
+                            Country <span className="text-red-500">*</span>
                           </label>
                           <select
                             value={billingInfo.country}
@@ -236,16 +362,18 @@ export default function CheckoutPage() {
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required
                           >
                             <option value="">Select</option>
                             <option value="nigeria">Nigeria</option>
                             <option value="ghana">Ghana</option>
                             <option value="kenya">Kenya</option>
+                            <option value="south-africa">South Africa</option>
                           </select>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Region/State
+                            Region/State <span className="text-red-500">*</span>
                           </label>
                           <select
                             value={billingInfo.region}
@@ -257,16 +385,19 @@ export default function CheckoutPage() {
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required
                           >
                             <option value="">Select</option>
                             <option value="lagos">Lagos</option>
                             <option value="abuja">Abuja</option>
                             <option value="kano">Kano</option>
+                            <option value="rivers">Rivers</option>
+                            <option value="ogun">Ogun</option>
                           </select>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            City
+                            City <span className="text-red-500">*</span>
                           </label>
                           <select
                             value={billingInfo.city}
@@ -278,6 +409,7 @@ export default function CheckoutPage() {
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required
                           >
                             <option value="">Select</option>
                             <option value="ikeja">Ikeja</option>
@@ -285,6 +417,8 @@ export default function CheckoutPage() {
                               Victoria Island
                             </option>
                             <option value="lekki">Lekki</option>
+                            <option value="surulere">Surulere</option>
+                            <option value="yaba">Yaba</option>
                           </select>
                         </div>
                         <div>
@@ -302,7 +436,7 @@ export default function CheckoutPage() {
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Zip code"
+                            placeholder="100001"
                           />
                         </div>
                       </div>
@@ -311,7 +445,7 @@ export default function CheckoutPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Email
+                            Email <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="email"
@@ -324,12 +458,13 @@ export default function CheckoutPage() {
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Email address"
+                            placeholder="john@example.com"
+                            required
                           />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Phone Number
+                            Phone Number <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="tel"
@@ -342,7 +477,8 @@ export default function CheckoutPage() {
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Phone number"
+                            placeholder="+234 801 234 5678"
+                            required
                           />
                         </div>
                       </div>
@@ -360,177 +496,8 @@ export default function CheckoutPage() {
                           htmlFor="ship-different"
                           className="ml-2 text-sm text-gray-600"
                         >
-                          Ship into different address
+                          Ship to different address
                         </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Option */}
-                  <div className="mb-8">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-6 border-b-2 border-blue-600 pb-2 inline-block">
-                      Payment Option
-                    </h2>
-
-                    <div className="space-y-4">
-                      {/* Bank Transfer */}
-                      <div className="flex items-center p-4 border border-gray-200 rounded-lg">
-                        <input
-                          type="radio"
-                          id="bank-transfer"
-                          name="payment"
-                          value="bank"
-                          checked={selectedPayment === "bank"}
-                          onChange={(e) => setSelectedPayment(e.target.value)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <label
-                          htmlFor="bank-transfer"
-                          className="ml-3 flex items-center"
-                        >
-                          <span className="text-blue-600 font-medium">
-                            Bank Transfer
-                          </span>
-                        </label>
-                      </div>
-
-                      {/* Amazon Pay / Flutterwave */}
-                      <div className="flex items-center p-4 border border-gray-200 rounded-lg">
-                        <input
-                          type="radio"
-                          id="amazon-pay"
-                          name="payment"
-                          value="amazon"
-                          checked={selectedPayment === "amazon"}
-                          onChange={(e) => setSelectedPayment(e.target.value)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <label
-                          htmlFor="amazon-pay"
-                          className="ml-3 flex items-center"
-                        >
-                          <span className="text-orange-500 font-medium">
-                            Amazon Pay
-                          </span>
-                          <span className="ml-2 text-sm text-gray-500">
-                            (Flutterwave)
-                          </span>
-                        </label>
-                      </div>
-
-                      {/* Credit/Debit Card */}
-                      <div className="border border-gray-200 rounded-lg">
-                        <div className="flex items-center p-4">
-                          <input
-                            type="radio"
-                            id="credit-card"
-                            name="payment"
-                            value="card"
-                            checked={selectedPayment === "card"}
-                            onChange={(e) => setSelectedPayment(e.target.value)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                          />
-                          <label
-                            htmlFor="credit-card"
-                            className="ml-3 flex items-center"
-                          >
-                            <span className="font-medium">
-                              Credit/Debit Card
-                            </span>
-                            <div className="ml-3 flex items-center">
-                              <div className="w-8 h-5 bg-red-500 rounded-sm flex items-center justify-center">
-                                <span className="text-white text-xs font-bold">
-                                  M
-                                </span>
-                              </div>
-                            </div>
-                          </label>
-                        </div>
-
-                        {/* Card Details */}
-                        {selectedPayment === "card" && (
-                          <div className="p-4 border-t border-gray-200 space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Name on Card
-                              </label>
-                              <input
-                                type="text"
-                                value={cardInfo.nameOnCard}
-                                onChange={(e) =>
-                                  handleInputChange(
-                                    "card",
-                                    "nameOnCard",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Name on card"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Card Number
-                              </label>
-                              <input
-                                type="text"
-                                value={cardInfo.cardNumber}
-                                onChange={(e) =>
-                                  handleInputChange(
-                                    "card",
-                                    "cardNumber",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="1234 5678 9012 3456"
-                                maxLength={19}
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Expiry Date
-                                </label>
-                                <input
-                                  type="text"
-                                  value={cardInfo.expiryDate}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      "card",
-                                      "expiryDate",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  placeholder="MM/YY"
-                                  maxLength={5}
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  CVC
-                                </label>
-                                <input
-                                  type="text"
-                                  value={cardInfo.cvc}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      "card",
-                                      "cvc",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  placeholder="123"
-                                  maxLength={4}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -559,13 +526,31 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Order Summary */}
+            {/* Order Summary - UPDATED to use centralized calculations */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 sticky top-4">
                 <div className="p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-6 border-b-2 border-blue-600 pb-2 inline-block">
                     Order Summary
                   </h2>
+
+                  {/* Free Shipping Progress */}
+                  {!state.isFreeShipping && (
+                    <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-800 font-medium">
+                        🚚 Free Shipping After Purchase Order of ₦990,000.00
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Add{" "}
+                        {formatPrice(
+                          state.totalAmount >= 990000
+                            ? 0
+                            : 990000 - state.totalAmount
+                        )}{" "}
+                        more for free shipping
+                      </p>
+                    </div>
+                  )}
 
                   {/* Cart Items */}
                   <div className="space-y-4 mb-6">
@@ -595,43 +580,58 @@ export default function CheckoutPage() {
                     ))}
                   </div>
 
-                  {/* Order Totals */}
+                  {/* Order Totals - Using centralized calculations */}
                   <div className="space-y-3 border-t border-gray-200 pt-4">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal</span>
+                      <span className="text-gray-600">Cart Subtotal</span>
                       <span className="font-medium">
                         {formatPrice(state.totalAmount)}
                       </span>
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Shipping</span>
-                      <span className="font-medium text-green-600">Free</span>
+                      <span className="text-gray-600">Estimated tax</span>
+                      <span className="font-medium">
+                        {formatPrice(state.taxAmount)}
+                      </span>
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Tax</span>
-                      <span className="font-medium">₦0.00</span>
+                      <span className="text-gray-600">Shipping</span>
+                      <span
+                        className={`font-medium ${state.isFreeShipping ? "text-green-600" : ""}`}
+                      >
+                        {state.isFreeShipping
+                          ? "Free"
+                          : formatPrice(state.shippingCost)}
+                      </span>
                     </div>
 
                     <div className="border-t border-gray-200 pt-3">
                       <div className="flex justify-between text-lg font-semibold">
-                        <span>Total</span>
+                        <span>Order total</span>
                         <span className="text-red-600">
-                          {formatPrice(totalAmount)}
+                          {formatPrice(state.finalTotal)}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Place Order Button */}
+                  {/* Proceed to Review Button */}
                   <div className="mt-6">
-                    <Link
-                      href="/review"
-                      className="w-full bg-red-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors block text-center"
+                    <button
+                      onClick={handleProceedToReview}
+                      className="w-full bg-red-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors"
                     >
-                      Review
-                    </Link>
+                      Proceed to Review
+                    </button>
+                  </div>
+
+                  {/* Security Notice */}
+                  <div className="mt-4 text-center">
+                    <p className="text-xs text-gray-500">
+                      🔒 Your information is encrypted and secure
+                    </p>
                   </div>
                 </div>
               </div>

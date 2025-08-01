@@ -1,4 +1,4 @@
-// src/components/Header.tsx - Using Shared ProductsCache (Much Cleaner!)
+// src/components/Header.tsx
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -6,12 +6,12 @@ import Image from "next/image";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { searchProducts, Product } from "@/lib/ProductsCache"; // 🔥 Clean import!
+import { searchProducts, Product } from "@/lib/ProductsCache";
 import { useCart } from "@/lib/CartContext";
 import { useWishlist } from "@/lib/WishlistContext";
 import clsx from "clsx";
 
-// Debounce utility function
+// Debounce utility function (keep this as is)
 const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout;
   return function executedFunction(...args: any[]) {
@@ -33,21 +33,52 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
+  // --- NEW STATE FOR CART ANIMATION ---
+  const [isCartActuallyOpen, setIsCartActuallyOpen] = useState(false); // Controls if cart JSX is in DOM
+  const [cartAnimationClass, setCartAnimationClass] =
+    useState("translate-x-full"); // Controls the slide animation
+
   const router = useRouter();
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Context integrations
   const {
-    state,
+    state, // This 'state' from useCart contains 'isOpen'
     toggleCart,
     closeCart,
     updateQuantity,
     removeFromCart,
     formatPrice,
+    notification,
   } = useCart();
   const { wishlistCount } = useWishlist();
 
-  // Categories configuration
+  // --- NEW useEffect for Cart Animation Logic ---
+  useEffect(() => {
+    if (state.isOpen) {
+      // If the cart *should* be open (from CartContext),
+      // first make sure the component is rendered in the DOM.
+      setIsCartActuallyOpen(true);
+      // Then, after a very small delay to allow DOM render,
+      // set the class to slide it into view.
+      const timer = setTimeout(() => {
+        setCartAnimationClass("translate-x-0");
+      }, 50); // Small delay (e.g., 50ms)
+      return () => clearTimeout(timer);
+    } else {
+      // If the cart *should* be closed,
+      // first set the class to slide it out of view.
+      setCartAnimationClass("translate-x-full");
+      // After the transition completes (300ms duration + 50ms buffer),
+      // remove the component from the DOM.
+      const timer = setTimeout(() => {
+        setIsCartActuallyOpen(false);
+      }, 350); // Match CSS transition duration (300ms) + buffer
+      return () => clearTimeout(timer);
+    }
+  }, [state.isOpen]); // This effect runs whenever state.isOpen changes
+
+  // Categories configuration (keep this as is)
   const categories = [
     "Home & Kitchen",
     "Furniture",
@@ -82,7 +113,7 @@ export default function Header() {
     Generator: ["Petrol Generator", "Diesel Generator", "Gas Generator"],
     Freezers: ["Chest Freezer", "Upright Freezer", "Mini Freezer"],
     Microwave: ["Solo Microwave", "Grill Microwave", "Convection Microwave"],
-    Extentions: ["Ac guard"],
+    Extensions: [],
     "Pressing Iron": ["Dry Iron", "Steam Iron"],
     Stabilizer: [],
     "Air Conditioner": ["Split AC", "Window AC", "Portable AC"],
@@ -103,10 +134,8 @@ export default function Header() {
       "90x60 Cookers",
       "Air Fryer",
     ],
-
     Blender: ["Hand Blender", "Stand Blender", "Smoothie Blender"],
     "Audio Bass": ["Speakers", "Headphones", "Sound Bar"],
-    Others: ["Accessories", "Parts", "Tools"],
   };
 
   const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -131,7 +160,6 @@ export default function Header() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // 🚀 SUPER CLEAN: Debounced search using shared cache
   const debouncedSearch = useCallback(
     debounce(async (searchTerm: string) => {
       if (!searchTerm.trim()) {
@@ -144,7 +172,6 @@ export default function Header() {
       setError(null);
 
       try {
-        // 🔥 ONE LINE! All caching handled automatically
         const results = await searchProducts(searchTerm);
         setSearchResults(results.slice(0, 8)); // Show max 8 results in dropdown
         setShowSearchResults(true);
@@ -159,12 +186,10 @@ export default function Header() {
     []
   );
 
-  // Search products as user types
   useEffect(() => {
     debouncedSearch(search);
   }, [search, debouncedSearch]);
 
-  // Close search results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -179,7 +204,6 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setExpandedCategory(null);
@@ -228,7 +252,7 @@ export default function Header() {
     setIsMobileMenuOpen(false);
   };
 
-  // Search Results Component
+  // Search Results Component (keep this as is)
   const SearchResults = () => (
     <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1 max-h-96 overflow-y-auto">
       {isSearching ? (
@@ -291,13 +315,6 @@ export default function Header() {
             <p>No products found for "{search}"</p>
             <div className="mt-2 space-y-1">
               <Link
-                href={`/shop?search=${encodeURIComponent(search.trim())}`}
-                className="block text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
-                onClick={() => setShowSearchResults(false)}
-              >
-                Search all products
-              </Link>
-              <Link
                 href="/shop"
                 className="block text-gray-600 hover:text-gray-700 text-sm transition-colors"
                 onClick={() => setShowSearchResults(false)}
@@ -313,6 +330,13 @@ export default function Header() {
 
   return (
     <header className="bg-white relative w-full">
+      {/* Notification Pop-up */}
+      {notification && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl z-[1002] transition-all duration-300 ease-out animate-slideInDown">
+          <p className="font-semibold">{notification}</p>
+        </div>
+      )}
+
       {/* Error Banner */}
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 text-center text-sm">
@@ -400,7 +424,10 @@ export default function Header() {
               className="flex items-center gap-[8px] hover:text-red-500 cursor-pointer transition-colors"
             >
               <div className="relative">
-                <Icon icon="icon-park-outline:like" className="w-6 h-6 text-black" />
+                <Icon
+                  icon="icon-park-outline:like"
+                  className="w-6 h-6 text-black"
+                />
                 {wishlistCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                     {wishlistCount > 99 ? "99+" : wishlistCount}
@@ -410,9 +437,9 @@ export default function Header() {
               <span className="head_span hidden lg:inline">Wishlist</span>
             </Link>
 
-            {/* Cart Icon with Count */}
+            {/* Cart Icon with Count - Calls toggleCart from Context */}
             <button
-              onClick={toggleCart}
+              onClick={toggleCart} // This correctly opens the sidebar
               className="flex items-center gap-[8px] hover:text-red-500 cursor-pointer relative transition-colors"
               aria-label={`Cart with ${state.totalItems} items`}
             >
@@ -450,12 +477,12 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation (keep this as is) */}
       <div className="border-t border-gray-200">
         <div className="w-full px-4 lg:max-w-[1400px] relative m-auto lg:mx-auto">
           {/* Mobile Layout */}
           <div className="w-full sm:hidden flex items-center justify-between py-4">
-            {/* Hamburger Menu Button --------------------------------------------------------------------------------- */}
+            {/* Hamburger Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -525,7 +552,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden sm:flex items-center py-3 text-lg relative font-bold gap-4 text-gray-700 justify-between overflow-x-auto">
-            {/* Hamburger Menu Button */}
+            {/* All Categories Button */}
             <button
               ref={categoryButtonRef}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -568,7 +595,8 @@ export default function Header() {
           </nav>
         </div>
       </div>
-      {/* Mobile Categories Dropdown Menu */}
+
+      {/* Mobile Categories Dropdown Menu (keep as is) */}
       {isMobileMenuOpen && (
         <>
           <div
@@ -657,14 +685,21 @@ export default function Header() {
         </>
       )}
 
-      {/* Cart Sidebar */}
-      {state.isOpen && (
+      {/* Cart Sidebar - Controlled by new animation states */}
+      {isCartActuallyOpen && (
         <>
+          {/* Overlay */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-50"
+            className="fixed inset-0 bg-black bg-opacity-50 z-[1000]"
             onClick={closeCart}
           />
-          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl z-50 transform transition-transform duration-300">
+          {/* Cart Sidebar itself */}
+          <div
+            className={clsx(
+              "fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl z-[1001] transform transition-transform duration-300",
+              cartAnimationClass
+            )}
+          >
             <div className="flex flex-col h-full">
               <div className="flex items-center justify-between p-4 border-b bg-gray-50">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -742,71 +777,29 @@ export default function Header() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center border rounded">
-                            <button
-                              onClick={() =>
-                                updateQuantity(item.id, item.quantity - 1)
-                              }
-                              className="p-1 hover:bg-gray-100 transition-colors"
-                              aria-label="Decrease quantity"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M20 12H4"
-                                />
-                              </svg>
-                            </button>
-                            <span className="px-3 py-1 text-sm font-medium">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() =>
-                                updateQuantity(item.id, item.quantity + 1)
-                              }
-                              className="p-1 hover:bg-gray-100 transition-colors"
-                              aria-label="Increase quantity"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 4v16m8-8H4"
-                                />
-                              </svg>
-                            </button>
-                          </div>
+                          <button
+                            onClick={() =>
+                              updateQuantity(item.id, item.quantity - 1)
+                            }
+                            disabled={item.quantity <= 1}
+                            className="p-1 rounded bg-gray-100 hover:bg-gray-200"
+                          >
+                            -
+                          </button>
+                          <span>{item.quantity}</span>
+                          <button
+                            onClick={() =>
+                              updateQuantity(item.id, item.quantity + 1)
+                            }
+                            className="p-1 rounded bg-gray-100 hover:bg-gray-200"
+                          >
+                            +
+                          </button>
                           <button
                             onClick={() => removeFromCart(item.id)}
-                            className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                            aria-label="Remove item"
+                            className="text-red-500 hover:text-red-700 ml-2"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
+                            <Icon icon="ic:round-delete" className="w-5 h-5" />
                           </button>
                         </div>
                       </div>
@@ -814,37 +807,35 @@ export default function Header() {
                   </div>
                 )}
               </div>
-
               {state.items.length > 0 && (
-                <div className="border-t p-4 space-y-4 bg-gray-50">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-gray-900">
-                      Total:
-                    </span>
+                <div className="p-4 border-t bg-gray-50">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-lg font-semibold">Subtotal:</span>
                     <span className="text-lg font-bold text-red-600">
-                      {formatPrice(state.totalAmount)}
+                      {formatPrice(
+                        state.items.reduce(
+                          (acc, item) => acc + item.amount * item.quantity,
+                          0
+                        )
+                      )}
                     </span>
                   </div>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => {
-                        router.push("/cart");
-                        closeCart();
-                      }}
-                      className="w-full bg-white border border-gray-300 text-gray-800 py-3 rounded-full hover:bg-gray-50 transition-colors font-medium"
-                    >
-                      View Cart
-                    </button>
-                    <button
-                      onClick={() => {
-                        router.push("/checkout");
-                        closeCart();
-                      }}
-                      className="w-full bg-red-500 text-white py-3 rounded-full hover:bg-red-600 transition-colors font-medium"
-                    >
-                      Checkout
-                    </button>
-                  </div>
+
+                  <Link
+                    href="/cart"
+                    onClick={closeCart}
+                    className="block w-full text-center bg-gray-300 text-gray-700 py-3 mb-4  rounded-full hover:bg-gray-500 transition-colors text-lg font-semibold"
+                  >
+                    Proceed to Checkout
+                  </Link>
+
+                  <Link
+                    href="/checkout"
+                    onClick={closeCart}
+                    className="block w-full text-center bg-red-500 text-white py-3 rounded-full hover:bg-red-600 transition-colors text-lg font-semibold"
+                  >
+                    Proceed to Checkout
+                  </Link>
                 </div>
               )}
             </div>

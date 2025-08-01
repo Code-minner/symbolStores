@@ -1,11 +1,18 @@
 // contexts/AuthContext.tsx - Enhanced version with fixed activity detection
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { User, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { createContext, useContext, useEffect, useState, useRef } from "react";
+import {
+  User,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 interface UserData {
   uid: string;
@@ -26,14 +33,17 @@ interface UserData {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: (User & { id?: string }) | null; // Extend Firebase User to add optional 'id'
   userData: UserData | null;
   loading: boolean;
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<any>;
   signUp: (email: string, password: string, userData: any) => Promise<any>;
   updateProfile: (data: Partial<UserData>) => Promise<void>;
-  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
   extendSession: () => void;
   getRemainingTime: () => number;
 }
@@ -48,13 +58,13 @@ const AuthContext = createContext<AuthContextType>({
   updateProfile: async () => {},
   changePassword: async () => {},
   extendSession: () => {},
-  getRemainingTime: () => 0
+  getRemainingTime: () => 0,
 });
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
@@ -68,7 +78,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
   const WARNING_TIME = 5 * 60 * 1000; // Show warning 5 minutes before timeout
   const ACTIVITY_THROTTLE = 60 * 1000; // Only refresh session every 60 seconds
-  
+
   // 🔧 FIXED: Use useRef for immediate access, state for UI updates
   const lastActivityRef = useRef<number>(Date.now());
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
@@ -82,8 +92,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     lastActivityRef.current = now;
     setLastActivity(now);
     // 🔧 FIXED: Only log occasionally to reduce console spam
-    if (Math.random() < 0.1) { // Only log 10% of the time
-      console.log('Activity detected - session refreshed');
+    if (Math.random() < 0.1) {
+      // Only log 10% of the time
+      console.log("Activity detected - session refreshed");
     }
   };
 
@@ -91,7 +102,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const extendSession = () => {
     updateActivity();
     setShowingWarning(false);
-    console.log('Session manually extended');
+    console.log("Session manually extended");
   };
 
   // 📊 Get remaining session time
@@ -104,31 +115,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // 🚪 Auto logout due to inactivity
   const autoLogout = async () => {
-    console.log('Session expired due to inactivity');
+    console.log("Session expired due to inactivity");
     setShowingWarning(false);
-    
+
     try {
       await signOut();
       // Show alert after logout
       setTimeout(() => {
-        alert('Your session has expired due to inactivity. Please log in again for security.');
+        alert(
+          "Your session has expired due to inactivity. Please log in again for security."
+        );
       }, 100);
     } catch (error) {
-      console.error('Error during auto logout:', error);
+      console.error("Error during auto logout:", error);
     }
   };
 
   // 🔔 Show session warning
   const showSessionWarning = () => {
     if (showingWarning) return; // Don't show multiple warnings
-    
+
     setShowingWarning(true);
     const remainingMinutes = Math.ceil(getRemainingTime() / (60 * 1000));
-    
+
     const shouldExtend = confirm(
       `⚠️ Session Timeout Warning\n\nYour session will expire in ${remainingMinutes} minutes due to inactivity.\n\nClick "OK" to extend your session, or "Cancel" to logout now.`
     );
-    
+
     if (shouldExtend) {
       extendSession();
     } else {
@@ -167,8 +180,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setWarningTimer(warnTimer);
 
     // 🔧 FIXED: Only log timer setup occasionally
-    if (Math.random() < 0.2) { // Only log 20% of the time
-      console.log(`Session timers set: ${SESSION_TIMEOUT / 1000 / 60} minutes until timeout`);
+    if (Math.random() < 0.2) {
+      // Only log 20% of the time
+      console.log(
+        `Session timers set: ${SESSION_TIMEOUT / 1000 / 60} minutes until timeout`
+      );
     }
   };
 
@@ -183,10 +199,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user) return;
 
     const events = [
-      'mousedown', 'mousemove', 'keypress', 'scroll', 
-      'touchstart', 'click', 'keydown', 'focus'
+      "mousedown",
+      "mousemove",
+      "keypress",
+      "scroll",
+      "touchstart",
+      "click",
+      "keydown",
+      "focus",
     ];
-    
+
     // 🔧 FIXED: Proper throttling using useRef for immediate access
     const handleActivity = () => {
       const now = Date.now();
@@ -197,7 +219,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     // Add event listeners
-    events.forEach(event => {
+    events.forEach((event) => {
       document.addEventListener(event, handleActivity, true);
     });
 
@@ -206,7 +228,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Cleanup function
     return () => {
-      events.forEach(event => {
+      events.forEach((event) => {
         document.removeEventListener(event, handleActivity, true);
       });
       clearAllTimers();
@@ -218,7 +240,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const fetchUserData = async () => {
       if (user) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
             setUserData({
@@ -236,21 +258,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               zipCode: data.zipCode,
               profilePicture: data.profilePicture,
               createdAt: data.createdAt,
-              updatedAt: data.updatedAt
+              updatedAt: data.updatedAt,
             });
           } else {
             setUserData({
               uid: user.uid,
               email: user.email,
               displayName: user.displayName,
-              isAdmin: false
+              isAdmin: false,
             });
           }
-          
+
           // Initialize session tracking when user data is loaded
           updateActivity();
         } catch (error) {
-          console.error('Error fetching user data:', error);
+          console.error("Error fetching user data:", error);
         }
       } else {
         setUserData(null);
@@ -266,11 +288,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      console.log('User signed in successfully');
+      console.log("User signed in successfully");
       updateActivity(); // Reset activity timer on login
       return result;
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error("Sign in error:", error);
       throw error;
     }
   };
@@ -278,22 +300,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // 📝 Sign up function
   const signUp = async (email: string, password: string, newUserData: any) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log('User created successfully');
-      
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      console.log("User created successfully");
+
       // Create user document in Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
+      await setDoc(doc(db, "users", userCredential.user.uid), {
         ...newUserData,
         isAdmin: false,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
-      
-      console.log('User document created in Firestore');
+
+      console.log("User document created in Firestore");
       updateActivity(); // Reset activity timer on signup
       return userCredential;
     } catch (error) {
-      console.error('Sign up error:', error);
+      console.error("Sign up error:", error);
       throw error;
     }
   };
@@ -301,29 +327,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // 💾 Update profile function
   const updateProfile = async (data: Partial<UserData>) => {
     if (!user) {
-      throw new Error('User not authenticated');
+      throw new Error("User not authenticated");
     }
 
     try {
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
         ...data,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
-      
+
       // Update local userData state
-      setUserData(prev => prev ? { ...prev, ...data } : null);
-      console.log('Profile updated successfully');
+      setUserData((prev) => (prev ? { ...prev, ...data } : null));
+      console.log("Profile updated successfully");
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error("Error updating profile:", error);
       throw error;
     }
   };
 
   // 🔒 Change password function
-  const changePassword = async (currentPassword: string, newPassword: string) => {
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ) => {
     if (!user || !user.email) {
-      throw new Error('User not authenticated');
+      throw new Error("User not authenticated");
     }
 
     try {
@@ -332,21 +361,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user.email,
         currentPassword
       );
-      
+
       await reauthenticateWithCredential(user, credential);
-      
+
       // Update password
       await updatePassword(user, newPassword);
-      
-      console.log('Password changed successfully');
+
+      console.log("Password changed successfully");
     } catch (error: any) {
-      console.error('Error changing password:', error);
-      if (error.code === 'auth/wrong-password') {
-        throw new Error('Current password is incorrect');
-      } else if (error.code === 'auth/weak-password') {
-        throw new Error('New password is too weak');
+      console.error("Error changing password:", error);
+      if (error.code === "auth/wrong-password") {
+        throw new Error("Current password is incorrect");
+      } else if (error.code === "auth/weak-password") {
+        throw new Error("New password is too weak");
       } else {
-        throw new Error('Failed to change password. Please try again.');
+        throw new Error("Failed to change password. Please try again.");
       }
     }
   };
@@ -358,9 +387,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setShowingWarning(false);
       await auth.signOut();
       setUserData(null);
-      console.log('User signed out successfully');
+      console.log("User signed out successfully");
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error);
       throw error;
     }
   };
@@ -369,19 +398,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!user) return;
 
-    const debugInterval = setInterval(() => {
-      const remaining = getRemainingTime();
-      const minutes = Math.floor(remaining / (60 * 1000));
-      const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
-      console.log(`Session remaining: ${minutes}m ${seconds}s`);
-    }, 5 * 60 * 1000); // Log every 5 minutes instead of 1 minute
+    const debugInterval = setInterval(
+      () => {
+        const remaining = getRemainingTime();
+        const minutes = Math.floor(remaining / (60 * 1000));
+        const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+        console.log(`Session remaining: ${minutes}m ${seconds}s`);
+      },
+      5 * 60 * 1000
+    ); // Log every 5 minutes instead of 1 minute
 
     return () => clearInterval(debugInterval);
   }, [user, lastActivity]);
 
   // ✅ FIXED: Handle undefined user by converting to null (your original fix)
   const value = {
-    user: user ?? null, // Convert undefined to null
+    user: user ? { ...user, id: user.uid } : null, // Map uid to id
     userData,
     loading: loading || dataLoading,
     signOut,
@@ -390,12 +422,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     updateProfile,
     changePassword,
     extendSession,
-    getRemainingTime
+    getRemainingTime,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

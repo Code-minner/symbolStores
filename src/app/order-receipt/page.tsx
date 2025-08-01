@@ -179,8 +179,8 @@ function OrderReceiptContent() {
                     <span className="text-blue-600 text-xs font-bold">1</span>
                   </div>
                   <p>
-                    We'll send you an email confirmation with your order
-                    details and tracking information.
+                    We'll send you an email confirmation with your order details
+                    and tracking information.
                   </p>
                 </div>
                 <div className="flex items-start gap-3">
@@ -197,8 +197,8 @@ function OrderReceiptContent() {
                     <span className="text-blue-600 text-xs font-bold">3</span>
                   </div>
                   <p>
-                    Once shipped, you'll receive tracking information to
-                    monitor your delivery.
+                    Once shipped, you'll receive tracking information to monitor
+                    your delivery.
                   </p>
                 </div>
                 <div className="flex items-start gap-3">

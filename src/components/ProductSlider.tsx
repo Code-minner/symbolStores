@@ -1,9 +1,9 @@
 // src/components/ProductSlider.tsx
-'use client';
+"use client";
 
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay } from 'swiper/modules';
-import 'swiper/css';
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay } from "swiper/modules";
+import "swiper/css";
 import ProductCard from "@/components/ProductCard";
 
 interface Product {
@@ -24,29 +24,28 @@ interface Product {
   tags?: string[];
 }
 
-
 export default function ProductSlider({ products }: { products: Product[] }) {
   if (!products || products.length === 0) return null;
 
   return (
     <section className="w-full py-4 pb-16">
-      <div className="max-w-[1400] mx-auto px-4">
-         <div className="flex justify-between items-center mt-16 mb-6">
-            <h2 className="text-[16px] sm:text-[22px] font-meduim text-gray-800 relative">
-              Related Products
-            </h2>
-            <a
-              href="#"
-              className="text-sm text-blue-500 hover:underline flex items-center gap-1"
-            >
-              View All <span>➔</span>
-            </a>
-          </div>
+      <div className="max-w-[1400px] mx-auto px-4">
+        <div className="flex justify-between items-center mt-16 mb-6">
+          <h2 className="text-[16px] sm:text-[22px] font-meduim text-gray-800 relative">
+            Related Products
+          </h2>
+          <a
+            href="#"
+            className="text-sm text-blue-500 hover:underline flex items-center gap-1"
+          >
+            View All <span>➔</span>
+          </a>
+        </div>
 
-          <div className="relative mb-6">
-            <span className="relative z-10 block w-[25%] h-1 mt-1 bg-blue-400 rounded-full"></span>
-            <span className="absolute left-[0%] top-[40%] block w-[100%] h-0.5 bg-gray-100 mb-1 rounded-full"></span>
-          </div>
+        <div className="relative mb-6">
+          <span className="relative z-10 block w-[25%] h-1 mt-1 bg-blue-400 rounded-full"></span>
+          <span className="absolute left-[0%] top-[40%] block w-[100%] h-0.5 bg-gray-100 mb-1 rounded-full"></span>
+        </div>
 
         <Swiper
           modules={[Autoplay]}
@@ -65,7 +64,7 @@ export default function ProductSlider({ products }: { products: Product[] }) {
           }}
         >
           {products.map((product) => (
-            <SwiperSlide key={product.id} className='items-stretch'>
+            <SwiperSlide key={product.id} className="items-stretch grid">
               <ProductCard product={product} />
             </SwiperSlide>
           ))}

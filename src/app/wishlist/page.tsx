@@ -456,8 +456,8 @@ export default function WishlistPage() {
                       <Image
                         src={item.imageURL}
                         alt={item.itemName}
+                        className="w-full h-[180px] sm:h-[220px] "
                         fill
-                        sizes="200px"
                         style={{
                           objectFit: "cover",
                           transition: "transform 0.3s ease, filter 0.3s ease",
@@ -534,8 +534,8 @@ export default function WishlistPage() {
                       {!item.inStock
                         ? "Out of Stock"
                         : item.originalPrice && item.originalPrice > item.amount
-                        ? "Sale"
-                        : ""}
+                          ? "Sale"
+                          : ""}
                     </span>
                   )}
                 </div>
@@ -660,8 +660,8 @@ export default function WishlistPage() {
                             handleQuantityChange(item.id, "decrease")
                           }
                           disabled={(quantities[item.id] || 1) <= 1}
+                  className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
                           style={{
-                            padding: "2.5px 3px",
                             fontSize: "1.125rem",
                             fontWeight: "bold",
                             background: "none",
@@ -677,8 +677,8 @@ export default function WishlistPage() {
                           -
                         </button>
                         <span
+                          className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
                           style={{
-                            padding: "2.5px 5px",
                             border: "2px solid #FF0000",
                             margin: "0 2px",
                             textAlign: "center",
@@ -692,8 +692,8 @@ export default function WishlistPage() {
                           onClick={() =>
                             handleQuantityChange(item.id, "increase")
                           }
+                          className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
                           style={{
-                            padding: "2.5px 3px",
                             fontSize: "1.125rem",
                             fontWeight: "bold",
                             background: "none",
@@ -709,7 +709,7 @@ export default function WishlistPage() {
                       <button
                         onClick={() => handleAddToCart(item)}
                         disabled={!item.inStock}
-                        className="text-[8px] sm:text-[12px] md:text-13px lg:text-[14px] p-[6px 8px] sm:p-[12px 12px]"
+                        className="text-[8px] sm:text-[12px] md:text-[13px] lg:text-[14px] py-2  sm:py-4  px-2"
                         style={{
                           flex: 1,
                           border: `1px solid ${

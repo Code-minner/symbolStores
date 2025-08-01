@@ -43,27 +43,30 @@ export default function ProductCard({
   // ✅ FIXED: Helper functions for type safety (same as details page)
   const safeBooleanValue = (value: any): boolean => {
     if (value === null || value === undefined) return false;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true' || value === '1';
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      return value.toLowerCase() === "true" || value === "1";
     }
     return Boolean(value);
   };
 
-  const safeStringValue = (value: any, fallback: string = ''): string => {
+  const safeStringValue = (value: any, fallback: string = ""): string => {
     if (value === null || value === undefined) return fallback;
-    if (typeof value === 'string') return value;
+    if (typeof value === "string") return value;
     return String(value);
   };
 
   // ✅ FIXED: Safe property access
   const isInStock = safeBooleanValue(product.inStock);
-  const productName = safeStringValue(product.itemName, 'Unnamed Product');
-  const productCategory = safeStringValue(product.category, 'unknown');
-  const productSubcategory = safeStringValue(product.subcategory, 'Product');
-  const productBrand = safeStringValue(product.brand, 'Unknown Brand');
+  const productName = safeStringValue(product.itemName, "Unnamed Product");
+  const productCategory = safeStringValue(product.category, "unknown");
+  const productSubcategory = safeStringValue(product.subcategory, "Product");
+  const productBrand = safeStringValue(product.brand, "Unknown Brand");
   const productSku = safeStringValue(product.sku, product.id);
-  const productImageURL = safeStringValue(product.imageURL, '/placeholder-image.jpg');
+  const productImageURL = safeStringValue(
+    product.imageURL,
+    "/placeholder-image.jpg"
+  );
 
   // ✅ FIXED: Safe wishlist check
   const isWishlisted = isInWishlist(product.id);
@@ -102,7 +105,7 @@ export default function ProductCard({
 
     // Reset quantity and show cart
     setQuantity(1);
-    toggleCart();
+    // toggleCart();
   };
 
   const handleWishlistToggle = () => {
@@ -132,7 +135,8 @@ export default function ProductCard({
   };
 
   // ✅ FIXED: Safe price calculations
-  const hasOriginalPrice = product.originalPrice && product.originalPrice > product.amount;
+  const hasOriginalPrice =
+    product.originalPrice && product.originalPrice > product.amount;
 
   return (
     <div
@@ -157,9 +161,9 @@ export default function ProductCard({
     >
       {/* Image Container - Fixed Height */}
       <div
+        className="h-[170px] sm:h-[220px]  "
         style={{
           position: "relative",
-          height: "200px",
           marginBottom: "10px",
           flexShrink: 0,
         }}
@@ -204,7 +208,7 @@ export default function ProductCard({
               onError={(e) => {
                 // Fallback for broken images
                 const target = e.target as HTMLImageElement;
-                target.src = '/placeholder-image.jpg';
+                target.src = "/placeholder-image.jpg";
               }}
             />
           </div>
@@ -228,10 +232,10 @@ export default function ProductCard({
             {!isInStock
               ? "Out of Stock"
               : hasOriginalPrice
-              ? "Sale"
-              : isTopRated
-              ? "Top Rated"
-              : ""}
+                ? "Sale"
+                : isTopRated
+                  ? "Top Rated"
+                  : ""}
           </span>
         )}
       </div>
@@ -379,8 +383,8 @@ export default function ProductCard({
                 <button
                   onClick={() => handleQuantityChange("decrease")}
                   disabled={quantity <= 1}
+                  className="text-[10px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
                   style={{
-                    padding: "2.5px 3px",
                     fontSize: "1.125rem",
                     fontWeight: "bold",
                     background: "none",
@@ -393,8 +397,8 @@ export default function ProductCard({
                   -
                 </button>
                 <span
+                  className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
                   style={{
-                    padding: "2.5px 5px",
                     border: "2px solid #FF0000",
                     margin: "0 2px",
                     textAlign: "center",
@@ -406,8 +410,8 @@ export default function ProductCard({
                 </span>
                 <button
                   onClick={() => handleQuantityChange("increase")}
+                  className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
                   style={{
-                    padding: "2.5px 6px",
                     fontSize: "1.125rem",
                     fontWeight: "bold",
                     background: "none",
@@ -424,7 +428,7 @@ export default function ProductCard({
               <button
                 onClick={handleAddToCart}
                 disabled={!isInStock}
-                className="text-[8px] sm:text-[12px] md:text-13px lg:text-[14px] p-[6px 8px] sm:p-[12px 12px]"
+                className="text-[8px] sm:text-[12px] md:text-[13px] lg:text-[14px] py-2 sm:py-4  px-2"
                 style={{
                   flex: 1,
                   border: `1px solid ${isInStock ? "#FF0000" : "#9CA3AF"}`,
@@ -434,7 +438,6 @@ export default function ProductCard({
                   borderRadius: "100px",
                   cursor: isInStock ? "pointer" : "not-allowed",
                   transition: "all 0.2s ease",
-                  height: "100%",
                 }}
                 onMouseOver={(e) => {
                   if (isInStock) {

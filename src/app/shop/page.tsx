@@ -103,6 +103,8 @@ function ShopContent() {
     discountOnly: false,
   });
 
+  const [brandsToShow, setBrandsToShow] = useState(10);
+
   // Price ranges
   const priceRanges = [
     { id: "all", label: "All Price", min: 0, max: Infinity },
@@ -587,7 +589,7 @@ function ShopContent() {
                   <div>
                     <button
                       onClick={clearFilters}
-                      className="text-sm text-orange-600 hover:text-orange-700 font-medium min-h-[44px] px-2 py-2"
+                      className="text-sm text-[#FF0000] hover:text-[#FF0000] font-medium min-h-[44px] px-2 py-2"
                     >
                       Clear All Filters
                     </button>
@@ -605,7 +607,7 @@ function ShopContent() {
                         placeholder="Search For Brands"
                         value={brandSearch}
                         onChange={(e) => setBrandSearch(e.target.value)}
-                        className="w-full px-3 py-3 pl-10 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500 min-h-[44px]"
+                        className="w-full px-3 py-3 pl-10 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-[#FF0000] focus:border-[#FF0000] min-h-[44px]"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg
@@ -644,8 +646,8 @@ function ShopContent() {
                               <div
                                 className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
                                   filters.selectedBrands.includes(brand)
-                                    ? "bg-orange-500 border-orange-500"
-                                    : "border-gray-300 group-hover:border-orange-400"
+                                    ? "bg-[#FF1000] border-[#FF0000]"
+                                    : "border-gray-300 group-hover:border-[#FF0000]"
                                 }`}
                               >
                                 {filters.selectedBrands.includes(brand) && (
@@ -671,14 +673,25 @@ function ShopContent() {
                     </div>
 
                     {/* View More Link */}
-                    {filteredBrands.length > 10 && (
+                    {allBrands.slice(0, brandsToShow).map((brand, index) => (
+                      <div key={index}>{brand}</div>
+                    ))}
+
+                    {allBrands.length > brandsToShow && (
                       <button
-                        onClick={() => setShowAllBrands(!showAllBrands)}
-                        className="text-sm text-orange-600 hover:text-orange-700 mt-4 font-medium min-h-[44px] px-2 py-2"
+                        onClick={() => setBrandsToShow(brandsToShow + 10)}
+                        className="text-sm text-[#FF0000] hover:text-[#FF0000] mt-4 font-medium min-h-[44px] px-2 py-2"
                       >
-                        {showAllBrands
-                          ? "← View less"
-                          : `View more (${filteredBrands.length - 10} more)`}
+                        View more ({allBrands.length - brandsToShow} more)
+                      </button>
+                    )}
+
+                    {brandsToShow > 10 && (
+                      <button
+                        onClick={() => setBrandsToShow(10)}
+                        className="text-sm text-gray-500 mt-2"
+                      >
+                        View less
                       </button>
                     )}
                   </div>
@@ -715,8 +728,8 @@ function ShopContent() {
                                     filters.selectedSubcategories.includes(
                                       subcategory
                                     )
-                                      ? "bg-orange-500 border-orange-500"
-                                      : "border-gray-300 group-hover:border-orange-400"
+                                      ? "bg-orange-500 border-[#FF0000]"
+                                      : "border-gray-300 group-hover:border-[#FF0000]"
                                   }`}
                                 >
                                   {filters.selectedSubcategories.includes(
@@ -768,12 +781,12 @@ function ShopContent() {
                             <div
                               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                                 filters.selectedPriceRange === range.id
-                                  ? "border-orange-500 bg-white"
-                                  : "border-gray-300 group-hover:border-orange-400"
+                                  ? "border-[#FF0000] bg-white"
+                                  : "border-gray-300 group-hover:border-[#FF0000]"
                               }`}
                             >
                               {filters.selectedPriceRange === range.id && (
-                                <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#FF0000]"></div>
                               )}
                             </div>
                           </div>
@@ -803,8 +816,8 @@ function ShopContent() {
                         <div
                           className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
                             filters.inStockOnly
-                              ? "bg-orange-500 border-orange-500"
-                              : "border-gray-300 group-hover:border-orange-400"
+                              ? "bg-orange-500 border-[#FF0000]"
+                              : "border-gray-300 group-hover:border-[#FF0000]"
                           }`}
                         >
                           {filters.inStockOnly && (
@@ -849,8 +862,8 @@ function ShopContent() {
                         <div
                           className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
                             filters.discountOnly
-                              ? "bg-orange-500 border-orange-500"
-                              : "border-gray-300 group-hover:border-orange-400"
+                              ? "bg-orange-500 border-[#FF0000]"
+                              : "border-gray-300 group-hover:border-[#FF0000]"
                           }`}
                         >
                           {filters.discountOnly && (
@@ -879,7 +892,7 @@ function ShopContent() {
                 <div className="border-t p-4">
                   <button
                     onClick={() => setShowMobileFilters(false)}
-                    className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium min-h-[48px]"
+                    className="w-full bg-[#FF1000] text-white py-3 rounded-lg hover:bg[#FF0000] transition-colors font-medium min-h-[48px]"
                   >
                     Apply Filters
                   </button>
@@ -1281,12 +1294,12 @@ function ShopContent() {
                     {brandParam && searchParam
                       ? `No ${brandParam} products found for "${searchParam}"`
                       : brandParam
-                      ? `No ${brandParam} products found`
-                      : searchParam
-                      ? `No products found for "${searchParam}"`
-                      : categoryParam || subcategoryParam
-                      ? `No products found in this category`
-                      : "Try adjusting your filters to see more products"}
+                        ? `No ${brandParam} products found`
+                        : searchParam
+                          ? `No products found for "${searchParam}"`
+                          : categoryParam || subcategoryParam
+                            ? `No products found in this category`
+                            : "Try adjusting your filters to see more products"}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     {(filters.selectedBrands.length > 0 ||
