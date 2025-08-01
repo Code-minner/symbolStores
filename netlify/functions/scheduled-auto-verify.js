@@ -1,14 +1,7 @@
-// netlify/functions/scheduled-auto-verify.js
-// Netlify Scheduled Function for Auto-Verification
-
-const { schedule } = require('@netlify/functions');
-
-// This function runs every 15 minutes
-const scheduledHandler = async (event, context) => {
-  console.log('🔄 Netlify scheduled auto-verification starting...');
+exports.handler = async (event, context) => {
+  console.log('🔄 Auto-verification starting...');
     
   try {
-    // Get your site URL from environment or construct it
     const siteUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.URL || 'http://localhost:3000';
     const cronSecret = process.env.CRON_SECRET;
         
@@ -20,7 +13,6 @@ const scheduledHandler = async (event, context) => {
       };
     }
         
-    // Call your API route
     const response = await fetch(`${siteUrl}/api/cron/auto-verify-payments`, {
       method: 'GET',
       headers: {
@@ -52,18 +44,13 @@ const scheduledHandler = async (event, context) => {
     }
       
   } catch (error) {
-    console.error('❌ Scheduled function error:', error);
+    console.error('❌ Function error:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: 'Scheduled function failed',
+        error: 'Function failed',
         details: error.message
       })
     };
   }
 };
-
-// Export the scheduled function
-const handler = schedule('*/15 * * * *', scheduledHandler);
-
-module.exports = { handler };
