@@ -3,7 +3,6 @@
 import { useState, CSSProperties } from "react";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
-import { transform } from "next/dist/build/swc/generated-native";
 import Link from "next/link";
 
 export default function Footer() {
