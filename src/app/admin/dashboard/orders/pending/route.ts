@@ -1,4 +1,9 @@
 // src/app/admin/dashboard/orders/pending/route.ts - WORKING NO-INDEX VERSION
+
+export const dynamic = "force-dynamic";
+
+
+
 import { NextRequest, NextResponse } from 'next/server';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';

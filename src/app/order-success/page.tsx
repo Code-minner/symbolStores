@@ -3,9 +3,7 @@
 
 export const dynamic = "force-dynamic";
 
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Icon } from '@iconify/react';
 import Link from 'next/link';
@@ -130,7 +128,24 @@ const ensureCalculatedTotals = (orderData: Partial<OrderData>): OrderData => {
   };
 };
 
-export default function OrderSuccessPage() {
+// Loading component
+function LoadingState() {
+  return (
+    <>
+      <Header />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading order details...</p>
+        </div>
+      </div>
+      <Footer />
+    </>
+  );
+}
+
+// Main content component that uses useSearchParams
+function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -740,5 +755,14 @@ export default function OrderSuccessPage() {
 
       <Footer />
     </div>
+  );
+}
+
+// Main page component with Suspense wrapper
+export default function OrderSuccessPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <OrderSuccessContent />
+    </Suspense>
   );
 }
