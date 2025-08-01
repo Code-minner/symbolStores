@@ -153,7 +153,7 @@ export function useFlutterwavePayment() {
             const config: FlutterwaveConfig = {
                 public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY!,
                 tx_ref: `FLW_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                amount: paymentData.finalTotal, // Use finalTotal here for the actual amount to be charged
+                amount: 100, // Use finalTotal here for the actual amount to be charged-----------------------------------
                 currency: 'NGN',
                 payment_options: 'card,mobilemoney,ussd,banktransfer',
                 customer: {

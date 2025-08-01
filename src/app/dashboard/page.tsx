@@ -13,7 +13,17 @@ import { OrderService } from "@/lib/orderService";
 interface OrderActivity {
   message: string;
   date: string;
-  type: "delivered" | "pickup" | "hub" | "transit" | "verified" | "confirmed" | "payment_submitted" | "payment_failed" | "processing" | "shipped";
+  type:
+    | "delivered"
+    | "pickup"
+    | "hub"
+    | "transit"
+    | "verified"
+    | "confirmed"
+    | "payment_submitted"
+    | "payment_failed"
+    | "processing"
+    | "shipped";
   completed?: boolean;
 }
 
@@ -25,7 +35,7 @@ interface TrackingData {
   total: string;
   currentStage: number;
   activities: OrderActivity[];
-  paymentMethod?: 'flutterwave' | 'bank_transfer';
+  paymentMethod?: "flutterwave" | "bank_transfer";
   status?: string;
   bankDetails?: {
     accountName: string;
@@ -49,7 +59,7 @@ interface DashboardOrder {
   items: any[];
   createdAt?: any;
   orderDate?: string;
-  paymentMethod?: 'flutterwave' | 'bank_transfer';
+  paymentMethod?: "flutterwave" | "bank_transfer";
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -279,7 +289,9 @@ const UserDashboard = () => {
   // Component State
   const [activeTab, setActiveTab] = useState<string>("profile");
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
-  const [selectedOrder, setSelectedOrder] = useState<DashboardOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<DashboardOrder | null>(
+    null
+  );
   const [showOrderDetails, setShowOrderDetails] = useState<boolean>(false);
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
@@ -287,7 +299,10 @@ const UserDashboard = () => {
   const [saving, setSaving] = useState<boolean>(false);
   const [changingPassword, setChangingPassword] = useState<boolean>(false);
   const [formInitialized, setFormInitialized] = useState<boolean>(false);
-  const [alertDialog, setAlertDialog] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [alertDialog, setAlertDialog] = useState<{
+    message: string;
+    visible: boolean;
+  }>({ message: "", visible: false });
 
   const [trackingForm, setTrackingForm] = useState<{
     orderId: string;
@@ -429,7 +444,9 @@ const UserDashboard = () => {
       if (order.paymentSubmittedAt) {
         activities.push({
           message: "Proof of payment submitted for verification",
-          date: order.paymentSubmittedAt.toDate?.()?.toLocaleDateString() || "Recently",
+          date:
+            order.paymentSubmittedAt.toDate?.()?.toLocaleDateString() ||
+            "Recently",
           type: "payment_submitted",
           completed: true,
         });
@@ -438,14 +455,20 @@ const UserDashboard = () => {
       if (order.paymentVerifiedAt) {
         activities.push({
           message: "Payment verified and confirmed",
-          date: order.paymentVerifiedAt.toDate?.()?.toLocaleDateString() || "Recently",
+          date:
+            order.paymentVerifiedAt.toDate?.()?.toLocaleDateString() ||
+            "Recently",
           type: "verified",
           completed: true,
         });
       }
     }
 
-    if (["processing", "shipped", "delivered"].includes(order.status.toLowerCase())) {
+    if (
+      ["processing", "shipped", "delivered"].includes(
+        order.status.toLowerCase()
+      )
+    ) {
       activities.push({
         message: "Order is being prepared for shipment",
         date: order.orderDate || order.date,
@@ -512,9 +535,16 @@ const UserDashboard = () => {
       const message = urlParams.get("message");
 
       if (message === "account_not_found") {
-        setAlertDialog({ message: "Your account was not found. Please sign in again.", visible: true });
+        setAlertDialog({
+          message: "Your account was not found. Please sign in again.",
+          visible: true,
+        });
       } else if (message === "authentication_required") {
-        setAlertDialog({ message: "Authentication required. Please sign in to access your dashboard.", visible: true });
+        setAlertDialog({
+          message:
+            "Authentication required. Please sign in to access your dashboard.",
+          visible: true,
+        });
       }
     }
   }, []);
@@ -558,19 +588,23 @@ const UserDashboard = () => {
         console.log("📦 Fetching orders for user:", user.uid);
 
         const userOrders = await OrderService.getUserOrders(user.uid);
-        
-        const dashboardOrders: DashboardOrder[] = userOrders.map(order => ({
+
+        const dashboardOrders: DashboardOrder[] = userOrders.map((order) => ({
           id: order.id,
           orderId: order.orderId,
           userId: order.userId,
           status: order.status,
-          date: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(), // Use createdAt for date
+          date:
+            order.createdAt?.toDate?.()?.toLocaleDateString() ||
+            new Date().toLocaleDateString(), // Use createdAt for date
           total: `₦${(order.totalAmount || 0).toLocaleString()}`, // Format total
           totalAmount: order.totalAmount,
           products: Array.isArray(order.items) ? order.items.length : 1,
           items: order.items,
           createdAt: order.createdAt,
-          orderDate: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+          orderDate:
+            order.createdAt?.toDate?.()?.toLocaleDateString() ||
+            new Date().toLocaleDateString(),
           paymentMethod: order.paymentMethod,
           customerName: order.customerName,
           customerEmail: order.customerEmail,
@@ -581,7 +615,7 @@ const UserDashboard = () => {
           paymentVerifiedAt: order.paymentVerifiedAt,
           transactionId: order.transactionId,
           reference: order.reference,
-          paymentStatus: order.paymentStatus
+          paymentStatus: order.paymentStatus,
         }));
 
         console.log("📦 Orders converted:", dashboardOrders.length);
@@ -625,7 +659,11 @@ const UserDashboard = () => {
     }
 
     if (!updateProfile) {
-      setAlertDialog({ message: "Profile update function not available. Please refresh the page.", visible: true });
+      setAlertDialog({
+        message:
+          "Profile update function not available. Please refresh the page.",
+        visible: true,
+      });
       return;
     }
 
@@ -640,10 +678,16 @@ const UserDashboard = () => {
         zipCode: formData.zipCode,
       });
 
-      setAlertDialog({ message: "Profile updated successfully!", visible: true });
+      setAlertDialog({
+        message: "Profile updated successfully!",
+        visible: true,
+      });
     } catch (error) {
       console.error("Error updating profile:", error);
-      setAlertDialog({ message: "Failed to update profile. Please try again.", visible: true });
+      setAlertDialog({
+        message: "Failed to update profile. Please try again.",
+        visible: true,
+      });
     } finally {
       setSaving(false);
     }
@@ -657,17 +701,27 @@ const UserDashboard = () => {
     }
 
     if (formData.newPassword.length < 8) {
-      setAlertDialog({ message: "Password must be at least 8 characters long!", visible: true });
+      setAlertDialog({
+        message: "Password must be at least 8 characters long!",
+        visible: true,
+      });
       return;
     }
 
     if (!formData.currentPassword) {
-      setAlertDialog({ message: "Please enter your current password", visible: true });
+      setAlertDialog({
+        message: "Please enter your current password",
+        visible: true,
+      });
       return;
     }
 
     if (!changePassword) {
-      setAlertDialog({ message: "Change password function not available. Please refresh the page.", visible: true });
+      setAlertDialog({
+        message:
+          "Change password function not available. Please refresh the page.",
+        visible: true,
+      });
       return;
     }
 
@@ -682,9 +736,16 @@ const UserDashboard = () => {
         confirmPassword: "",
       }));
 
-      setAlertDialog({ message: "Password changed successfully!", visible: true });
+      setAlertDialog({
+        message: "Password changed successfully!",
+        visible: true,
+      });
     } catch (error: any) {
-      setAlertDialog({ message: error.message || "Failed to change password. Please try again.", visible: true });
+      setAlertDialog({
+        message:
+          error.message || "Failed to change password. Please try again.",
+        visible: true,
+      });
     } finally {
       setChangingPassword(false);
     }
@@ -693,7 +754,10 @@ const UserDashboard = () => {
   // 🚪 LOGOUT FUNCTION
   const handleLogout = async () => {
     if (!signOut) {
-      setAlertDialog({ message: "Logout function not available. Please refresh the page.", visible: true });
+      setAlertDialog({
+        message: "Logout function not available. Please refresh the page.",
+        visible: true,
+      });
       return;
     }
 
@@ -702,36 +766,59 @@ const UserDashboard = () => {
       router.push("/");
     } catch (error) {
       console.error("Error signing out:", error);
-      setAlertDialog({ message: "Failed to log out. Please try again.", visible: true });
+      setAlertDialog({
+        message: "Failed to log out. Please try again.",
+        visible: true,
+      });
     }
   };
 
   // 📦 TRACK ORDER FUNCTION
   const handleTrackOrder = async (): Promise<void> => {
     if (!trackingForm.orderId.trim() || !trackingForm.billingEmail.trim()) {
-      setAlertDialog({ message: "Please fill in both Order ID and Billing Email", visible: true });
+      setAlertDialog({
+        message: "Please fill in both Order ID and Billing Email",
+        visible: true,
+      });
       return;
     }
 
     if (!user || !user.uid) {
-      setAlertDialog({ message: "Please log in to track your orders", visible: true });
+      setAlertDialog({
+        message: "Please log in to track your orders",
+        visible: true,
+      });
       return;
     }
 
     try {
       console.log("🔍 Tracking order:", trackingForm.orderId);
 
-      const orderResult = await OrderService.getOrderForTracking(trackingForm.orderId);
-      
+      const orderResult = await OrderService.getOrderForTracking(
+        trackingForm.orderId
+      );
+
       if (!orderResult.success || !orderResult.order) {
-        setAlertDialog({ message: "Order not found. Please check your Order ID and billing email.", visible: true });
+        setAlertDialog({
+          message:
+            "Order not found. Please check your Order ID and billing email.",
+          visible: true,
+        });
         return;
       }
 
       const order = orderResult.order;
-      
-      if (order.customerEmail && order.customerEmail.toLowerCase() !== trackingForm.billingEmail.toLowerCase()) {
-        setAlertDialog({ message: "Order not found. Please check your Order ID and billing email.", visible: true });
+
+      if (
+        order.customerEmail &&
+        order.customerEmail.toLowerCase() !==
+          trackingForm.billingEmail.toLowerCase()
+      ) {
+        setAlertDialog({
+          message:
+            "Order not found. Please check your Order ID and billing email.",
+          visible: true,
+        });
         return;
       }
 
@@ -740,13 +827,17 @@ const UserDashboard = () => {
         orderId: order.orderId,
         userId: order.userId,
         status: order.status,
-        date: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+        date:
+          order.createdAt?.toDate?.()?.toLocaleDateString() ||
+          new Date().toLocaleDateString(),
         total: `₦${(order.totalAmount || 0).toLocaleString()}`,
         totalAmount: order.totalAmount,
         products: Array.isArray(order.items) ? order.items.length : 1,
         items: order.items,
         createdAt: order.createdAt,
-        orderDate: order.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+        orderDate:
+          order.createdAt?.toDate?.()?.toLocaleDateString() ||
+          new Date().toLocaleDateString(),
         paymentMethod: order.paymentMethod,
         customerName: order.customerName,
         customerEmail: order.customerEmail,
@@ -762,11 +853,16 @@ const UserDashboard = () => {
 
       const enhancedTrackingData: TrackingData = {
         orderId: dashboardOrder.orderId || dashboardOrder.id,
-        products: Array.isArray(dashboardOrder.items) ? dashboardOrder.items.length : 1,
+        products: Array.isArray(dashboardOrder.items)
+          ? dashboardOrder.items.length
+          : 1,
         orderDate: dashboardOrder.orderDate || new Date().toLocaleDateString(),
         expectedDate: calculateExpectedDelivery(dashboardOrder),
         total: dashboardOrder.total,
-        currentStage: getOrderStage(dashboardOrder.status, dashboardOrder.paymentMethod),
+        currentStage: getOrderStage(
+          dashboardOrder.status,
+          dashboardOrder.paymentMethod
+        ),
         activities: generateOrderActivities(dashboardOrder),
         paymentMethod: dashboardOrder.paymentMethod,
         status: dashboardOrder.status,
@@ -775,18 +871,22 @@ const UserDashboard = () => {
         transactionId: dashboardOrder.transactionId,
         reference: dashboardOrder.reference,
       };
-      
+
       console.log("✅ Tracking data created:", enhancedTrackingData);
       setTrackingData(enhancedTrackingData);
-      
     } catch (error) {
       console.error("Error tracking order:", error);
-      setAlertDialog({ message: "Failed to track order. Please try again.", visible: true });
+      setAlertDialog({
+        message: "Failed to track order. Please try again.",
+        visible: true,
+      });
     }
   };
 
   const getStatusColor = (status: string): string => {
-    switch (status.toUpperCase()) { // Ensure status is uppercase for consistent matching
+    switch (
+      status.toUpperCase() // Ensure status is uppercase for consistent matching
+    ) {
       case "COMPLETED":
       case "DELIVERED":
       case "CONFIRMED":
@@ -861,12 +961,16 @@ const UserDashboard = () => {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-600">Order ID:</span>
-              <span className="font-medium">{selectedOrder.orderId || selectedOrder.id}</span>
+              <span className="font-medium">
+                {selectedOrder.orderId || selectedOrder.id}
+              </span>
             </div>
 
             <div className="flex justify-between">
               <span className="text-gray-600">Status:</span>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}
+              >
                 {selectedOrder.status}
               </span>
             </div>
@@ -884,12 +988,16 @@ const UserDashboard = () => {
             {selectedOrder.paymentMethod && (
               <div className="flex justify-between">
                 <span className="text-gray-600">Payment Method:</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  selectedOrder.paymentMethod === 'flutterwave' 
-                    ? 'bg-orange-100 text-orange-800' 
-                    : 'bg-blue-100 text-blue-800'
-                }`}>
-                  {selectedOrder.paymentMethod === 'flutterwave' ? 'Flutterwave' : 'Bank Transfer'}
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    selectedOrder.paymentMethod === "flutterwave"
+                      ? "bg-orange-100 text-orange-800"
+                      : "bg-blue-100 text-blue-800"
+                  }`}
+                >
+                  {selectedOrder.paymentMethod === "flutterwave"
+                    ? "Flutterwave"
+                    : "Bank Transfer"}
                 </span>
               </div>
             )}
@@ -900,11 +1008,15 @@ const UserDashboard = () => {
                 {selectedOrder.items?.length > 0 ? (
                   selectedOrder.items.map((item, index) => (
                     <li key={index} className="text-sm text-gray-700">
-                      {typeof item === 'string' ? item : item.itemName || 'Product'}
+                      {typeof item === "string"
+                        ? item
+                        : item.itemName || "Product"}
                     </li>
                   ))
                 ) : (
-                  <li className="text-sm text-gray-500">Order items not available</li>
+                  <li className="text-sm text-gray-500">
+                    Order items not available
+                  </li>
                 )}
               </ul>
             </div>
@@ -975,7 +1087,11 @@ const UserDashboard = () => {
       }
 
       if (!updateProfile) {
-        setAlertDialog({ message: "Profile update function not available. Please refresh the page.", visible: true });
+        setAlertDialog({
+          message:
+            "Profile update function not available. Please refresh the page.",
+          visible: true,
+        });
         return;
       }
 
@@ -995,10 +1111,16 @@ const UserDashboard = () => {
           ...localFormData,
         }));
 
-        setAlertDialog({ message: "Profile updated successfully!", visible: true });
+        setAlertDialog({
+          message: "Profile updated successfully!",
+          visible: true,
+        });
       } catch (error) {
         console.error("Error updating profile:", error);
-        setAlertDialog({ message: "Failed to update profile. Please try again.", visible: true });
+        setAlertDialog({
+          message: "Failed to update profile. Please try again.",
+          visible: true,
+        });
       } finally {
         setSaving(false);
       }
@@ -1006,28 +1128,44 @@ const UserDashboard = () => {
 
     const handleLocalChangePassword = async () => {
       if (passwordData.newPassword !== passwordData.confirmPassword) {
-        setAlertDialog({ message: "New passwords do not match!", visible: true });
+        setAlertDialog({
+          message: "New passwords do not match!",
+          visible: true,
+        });
         return;
       }
 
       if (passwordData.newPassword.length < 8) {
-        setAlertDialog({ message: "Password must be at least 8 characters long!", visible: true });
+        setAlertDialog({
+          message: "Password must be at least 8 characters long!",
+          visible: true,
+        });
         return;
       }
 
       if (!passwordData.currentPassword) {
-        setAlertDialog({ message: "Please enter your current password", visible: true });
+        setAlertDialog({
+          message: "Please enter your current password",
+          visible: true,
+        });
         return;
       }
 
       if (!changePassword) {
-        setAlertDialog({ message: "Change password function not available. Please refresh the page.", visible: true });
+        setAlertDialog({
+          message:
+            "Change password function not available. Please refresh the page.",
+          visible: true,
+        });
         return;
       }
 
       setChangingPassword(true);
       try {
-        await changePassword(passwordData.currentPassword, passwordData.newPassword);
+        await changePassword(
+          passwordData.currentPassword,
+          passwordData.newPassword
+        );
 
         setPasswordData({
           currentPassword: "",
@@ -1035,9 +1173,16 @@ const UserDashboard = () => {
           confirmPassword: "",
         });
 
-        setAlertDialog({ message: "Password changed successfully!", visible: true });
+        setAlertDialog({
+          message: "Password changed successfully!",
+          visible: true,
+        });
       } catch (error: any) {
-        setAlertDialog({ message: error.message || "Failed to change password. Please try again.", visible: true });
+        setAlertDialog({
+          message:
+            error.message || "Failed to change password. Please try again.",
+          visible: true,
+        });
       } finally {
         setChangingPassword(false);
       }
@@ -1048,33 +1193,38 @@ const UserDashboard = () => {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">ACCOUNT SETTING</h2>
 
-          {getRemainingTime && (() => {
-            const remaining = getRemainingTime();
-            const showWarning = remaining < 10 * 60 * 1000 && remaining > 0;
+          {getRemainingTime &&
+            (() => {
+              const remaining = getRemainingTime();
+              const showWarning = remaining < 10 * 60 * 1000 && remaining > 0;
 
-            if (remaining <= 0) return null;
+              if (remaining <= 0) return null;
 
-            return (
-              <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
-                showWarning
-                  ? "bg-red-100 text-red-700 border border-red-200"
-                  : "bg-green-100 text-green-700 border border-green-200"
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${
-                  showWarning ? "bg-red-500 animate-pulse" : "bg-green-500"
-                }`}></div>
-                <span>In Session</span>
-                {showWarning && extendSession && (
-                  <button
-                    onClick={extendSession}
-                    className="ml-1 px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
-                  >
-                    Extend
-                  </button>
-                )}
-              </div>
-            );
-          })()}
+              return (
+                <div
+                  className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
+                    showWarning
+                      ? "bg-red-100 text-red-700 border border-red-200"
+                      : "bg-green-100 text-green-700 border border-green-200"
+                  }`}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      showWarning ? "bg-red-500 animate-pulse" : "bg-green-500"
+                    }`}
+                  ></div>
+                  <span>In Session</span>
+                  {showWarning && extendSession && (
+                    <button
+                      onClick={extendSession}
+                      className="ml-1 px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
+                    >
+                      Extend
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
         </div>
 
         <div className="space-y-8">
@@ -1328,7 +1478,7 @@ const UserDashboard = () => {
   };
 
   const TrackOrderTab = () => (
-    <div className="bg-white rounded-lg p-6">
+    <div className="min-h-[400px]  bg-white rounded-lg p-6">
       <h2 className="text-xl font-bold mb-6">TRACK YOUR ORDER</h2>
       <div className="space-y-4">
         <div>
@@ -1396,7 +1546,9 @@ const UserDashboard = () => {
             </div>
             <div>
               <p className="text-gray-600">Payment Method:</p>
-              <p className="font-medium capitalize">{trackingData.paymentMethod?.replace('_', ' ')}</p>
+              <p className="font-medium capitalize">
+                {trackingData.paymentMethod?.replace("_", " ")}
+              </p>
             </div>
             {trackingData.transactionId && (
               <div>
@@ -1417,13 +1569,19 @@ const UserDashboard = () => {
             {trackingData.activities.map((activity, index) => (
               <div key={index} className="flex items-start w-full">
                 <div className="flex flex-col items-center mr-4">
-                  <div className={`w-4 h-4 rounded-full ${activity.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  <div
+                    className={`w-4 h-4 rounded-full ${activity.completed ? "bg-green-500" : "bg-gray-300"}`}
+                  ></div>
                   {index < trackingData.activities.length - 1 && (
-                    <div className={`w-0.5 flex-grow ${activity.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                    <div
+                      className={`w-0.5 flex-grow ${activity.completed ? "bg-green-500" : "bg-gray-300"}`}
+                    ></div>
                   )}
                 </div>
                 <div className="flex-1 pb-4">
-                  <p className={`font-medium ${activity.completed ? 'text-gray-800' : 'text-gray-500'}`}>
+                  <p
+                    className={`font-medium ${activity.completed ? "text-gray-800" : "text-gray-500"}`}
+                  >
                     {activity.message}
                   </p>
                   <p className="text-xs text-gray-400">{activity.date}</p>
@@ -1437,7 +1595,7 @@ const UserDashboard = () => {
   );
 
   const OrderHistoryTab = () => (
-    <div className="bg-white rounded-lg p-6">
+    <div className="min-h-[400px] bg-white rounded-lg p-6">
       <h2 className="text-xl font-bold mb-6">ORDER HISTORY</h2>
       {ordersLoading ? (
         <div className="text-center py-8">
@@ -1454,19 +1612,34 @@ const UserDashboard = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Order ID
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Date
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Total
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Products
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Status
                 </th>
                 <th scope="col" className="relative px-6 py-3">
@@ -1490,7 +1663,9 @@ const UserDashboard = () => {
                     {order.products}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}
+                    >
                       {order.status}
                     </span>
                   </td>
@@ -1522,18 +1697,21 @@ const UserDashboard = () => {
               onClick={() => setShowMobileMenu(!showMobileMenu)}
               className="p-2 border border-gray-300 rounded-lg flex items-center justify-between w-full bg-white text-gray-700"
             >
-              <span>{menuItems.find(item => item.id === activeTab)?.label || 'Menu'}</span>
+              <span>
+                {menuItems.find((item) => item.id === activeTab)?.label ||
+                  "Menu"}
+              </span>
               {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
 
           {/* Sidebar Navigation */}
           <div
-            className={`w-full lg:w-1/4 bg-white rounded-lg p-6 shadow-md lg:block ${
+            className={`w-full lg:w-1/4 bg-white h-auto max-h-fit rounded-lg p-6 shadow-md lg:block ${
               showMobileMenu ? "block" : "hidden"
             }`}
           >
-            <nav>
+            <nav className="min-h-auto">
               <ul className="space-y-2">
                 {menuItems.map((item) => (
                   <li key={item.id}>
