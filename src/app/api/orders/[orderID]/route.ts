@@ -65,5 +65,6 @@ export async function GET(
       error: 'Failed to fetch order details',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
+    
   }
 }
