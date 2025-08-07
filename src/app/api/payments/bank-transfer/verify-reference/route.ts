@@ -8,13 +8,31 @@ const FREE_SHIPPING_THRESHOLD = 990000.00; // ₦990,000.00
 const TAX_RATE = 0.0001; // 0.01% as a decimal
 const SHIPPING_COST = 900.00; // ₦900.00
 
-// Helper function to calculate proper totals
+// --- PRICE ROUNDING HELPER (same as CartContext) ---
+const roundUpToNearest10 = (price: number): number => {
+  return Math.ceil(price / 10) * 10;
+};
+
+// ✅ UPDATED: Helper function to calculate proper totals WITH ROUNDING
 const calculateTotals = (items: any[], providedSubtotal?: number) => {
-  const totalAmountItemsOnly = providedSubtotal ?? items.reduce((sum: number, item: any) => sum + (item.amount * item.quantity), 0);
+  // Calculate subtotal by rounding each item total, then sum (same as CartContext)
+  const totalAmountItemsOnly = providedSubtotal ?? 
+    items.reduce((sum: number, item: any) => {
+      const itemTotal = roundUpToNearest10(item.amount * item.quantity);
+      return sum + itemTotal;
+    }, 0);
+  
+  // Calculate shipping, tax, and final total with rounding
   const isFreeShipping = totalAmountItemsOnly >= FREE_SHIPPING_THRESHOLD;
-  const shippingCost = isFreeShipping ? 0 : SHIPPING_COST;
-  const taxAmount = totalAmountItemsOnly * TAX_RATE;
-  const finalTotal = totalAmountItemsOnly + shippingCost + taxAmount;
+  const shippingCost = isFreeShipping ? 0 : roundUpToNearest10(SHIPPING_COST);
+  const taxAmount = roundUpToNearest10(totalAmountItemsOnly * TAX_RATE);
+  const finalTotal = roundUpToNearest10(totalAmountItemsOnly + shippingCost + taxAmount);
+  
+  console.log('💰 Verify Reference - Totals Breakdown (WITH ROUNDING):');
+  console.log(`   Subtotal: ₦${totalAmountItemsOnly.toFixed(2)}`);
+  console.log(`   Shipping: ₦${shippingCost.toFixed(2)} ${isFreeShipping ? "(FREE!)" : ""}`);
+  console.log(`   Tax: ₦${taxAmount.toFixed(2)}`);
+  console.log(`   FINAL TOTAL: ₦${finalTotal.toFixed(2)}`);
   
   return {
     totalAmountItemsOnly,
@@ -77,7 +95,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ UPDATED: Calculate proper totals from order data
+    // ✅ UPDATED: Calculate proper totals from order data WITH ROUNDING
     let finalTotal = amount; // Default fallback
 
     // If order has items, calculate proper totals
@@ -88,13 +106,13 @@ export async function POST(request: NextRequest) {
       );
       finalTotal = calculatedTotals.finalTotal;
       
-      console.log('💰 Calculated final total with shipping and tax:', finalTotal);
+      console.log('💰 Calculated final total with shipping, tax, and rounding:', finalTotal);
     } else if (orderData.finalTotal) {
-      // Use stored finalTotal if available
-      finalTotal = orderData.finalTotal;
+      // Use stored finalTotal if available, but ensure it's rounded
+      finalTotal = roundUpToNearest10(orderData.finalTotal);
     } else if (orderData.total_amount) {
-      // Use stored total_amount if available (from order creation)
-      finalTotal = orderData.total_amount;
+      // Use stored total_amount if available, but ensure it's rounded
+      finalTotal = roundUpToNearest10(orderData.total_amount);
     }
 
     // ✅ UPDATED: Save with proper final total
@@ -105,7 +123,7 @@ export async function POST(request: NextRequest) {
       referenceSubmittedAt: new Date().toISOString(),
       status: 'pending_verification',
       customerSubmittedAmount: amount, // Keep original submitted amount for comparison
-      expectedFinalTotal: finalTotal, // Store the expected final total
+      expectedFinalTotal: finalTotal, // Store the expected final total (rounded)
       updatedAt: new Date().toISOString()
     });
 
@@ -114,7 +132,7 @@ export async function POST(request: NextRequest) {
       orderId,
       customerName: orderData.customerName || customerName,
       customerEmail: orderData.customerEmail || customerEmail,
-      expectedAmount: finalTotal, // Use calculated final total
+      expectedAmount: finalTotal, // Use calculated final total (rounded)
       submittedAmount: amount, // Amount customer thinks they should pay
       transactionReference: cleanReference,
       orderData: orderData // Pass full order data for breakdown
@@ -145,7 +163,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ UPDATED: Anti-spam admin notification with proper totals
+// ✅ KEEP EMAIL DESIGN UNCHANGED - Anti-spam admin notification with proper totals
 async function sendAdminNotification(data: {
   orderId: string;
   customerName: string;

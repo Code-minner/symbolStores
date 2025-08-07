@@ -1,4 +1,4 @@
-// src/app/admin/page.tsx - FIXED Admin Dashboard Using API Routes
+// src/app/admin/page.tsx - Updated Admin Dashboard with Comprehensive Cache Clearing
 
 "use client";
 
@@ -14,6 +14,8 @@ import Footer from "@/components/Footer";
 
 // Import your ProductsCache
 import { getAllProducts, clearProductsCache } from "@/lib/ProductsCache";
+// 🆕 NEW: Import comprehensive cache clearing utilities
+import { clearAllProductCaches } from "@/lib/cacheUtils";
 
 interface Product {
   id: string;
@@ -290,15 +292,18 @@ export default function AdminDashboard() {
     return 'border-green-500 bg-green-50';
   };
 
-  // Delete product
+  // 🆕 UPDATED: Delete product with comprehensive cache clearing
   const handleDeleteProduct = async (productId: string, productName: string) => {
     if (!confirm(`Delete "${productName}"?`)) return;
     
     try {
       await deleteDoc(doc(db, "products", productId));
-      clearProductsCache();
+      
+      // 🆕 NEW: Use comprehensive cache clearing
+      await clearAllProductCaches();
+      
       await loadProducts();
-      alert("Product deleted!");
+      alert("✅ Product deleted!\n\n🔄 Cache cleared - changes will appear on storefront within 10-15 seconds.");
     } catch (error) {
       console.error("Error deleting product:", error);
       alert("Error deleting product.");
@@ -320,10 +325,20 @@ export default function AdminDashboard() {
     }
   };
 
-  // Refresh all data
+  // 🆕 UPDATED: Refresh all data with comprehensive cache clearing
   const handleRefresh = async () => {
-    clearProductsCache();
+    // 🆕 NEW: Use comprehensive cache clearing
+    await clearAllProductCaches();
+    
     await Promise.all([loadProducts(), loadPendingOrders()]);
+  };
+
+  // 🆕 NEW: Manual cache clear function
+  const handleManualCacheClear = async () => {
+    if (confirm('🔄 Clear all product caches?\n\nThis will force fresh data on the next page load.')) {
+      await clearAllProductCaches();
+      alert('✅ Caches cleared!\n\nFresh data will load on next page visit.');
+    }
   };
 
   // Filter products
@@ -353,7 +368,7 @@ export default function AdminDashboard() {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Header */}
-          <div className="flex justify-between items-center mb-8">
+          <div className=" sm:flex justify-between items-center mb-8">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
               <p className="text-gray-600">Manage products and payment verifications</p>
@@ -366,11 +381,27 @@ export default function AdminDashboard() {
               >
                 {(loading || paymentLoading) ? 'Loading...' : 'Refresh'}
               </button>
+              
+              {/* 🆕 NEW: Manual cache clear button */}
+              <button
+                onClick={handleManualCacheClear}
+                className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+                title="Clear product cache manually"
+              >
+                🔄 Clear Cache
+              </button>
+              
               <button
                 onClick={() => router.push("/admin/add-product")}
                 className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
               >
                 + Add Product
+              </button>
+              <button
+                onClick={() => router.push("/admin/bluk-product")}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+              >
+                + Add Bulk
               </button>
               <button
                 onClick={handleLogout}

@@ -2,6 +2,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EmailService } from '@/lib/email';
 
+// --- PRICE ROUNDING HELPER (optional, for consistency) ---
+const roundUpToNearest10 = (price: number): number => {
+  return Math.ceil(price / 10) * 10;
+};
+
 export async function POST(request: NextRequest) {
   try {
     const { action, orderData } = await request.json();
@@ -11,25 +16,28 @@ export async function POST(request: NextRequest) {
     let result;
     
     if (action === 'approve') {
-      // Send approval/confirmation email
-      result = await EmailService.sendBankTransferConfirmation({
+      // ✅ OPTIONAL: Round amounts for perfect consistency
+      const roundedOrderData = {
         orderId: orderData.orderId,
         customerName: orderData.customerName,
         customerEmail: orderData.customerEmail,
         customerPhone: orderData.customerPhone || '',
-        amount: orderData.amount,
+        amount: roundUpToNearest10(orderData.amount || 0),
         items: orderData.items || [],
         bankDetails: orderData.bankDetails || {
           accountName: '',
           accountNumber: '',
           bankName: ''
         },
-        totalAmountItemsOnly: orderData.totalAmountItemsOnly,
-        shippingCost: orderData.shippingCost,
-        taxAmount: orderData.taxAmount,
-        finalTotal: orderData.finalTotal,
-        isFreeShipping: orderData.isFreeShipping
-      });
+        totalAmountItemsOnly: roundUpToNearest10(orderData.totalAmountItemsOnly || 0),
+        shippingCost: roundUpToNearest10(orderData.shippingCost || 0),
+        taxAmount: roundUpToNearest10(orderData.taxAmount || 0),
+        finalTotal: roundUpToNearest10(orderData.finalTotal || orderData.amount || 0),
+        isFreeShipping: orderData.isFreeShipping || false
+      };
+
+      // Send approval/confirmation email
+      result = await EmailService.sendBankTransferConfirmation(roundedOrderData);
     } else if (action === 'reject') {
       // For rejection, you might want to create a separate email template
       // For now, we'll just return success without sending

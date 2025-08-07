@@ -24,6 +24,11 @@ export const FREE_SHIPPING_THRESHOLD = 990000.00; // ₦990,000.00
 export const TAX_RATE = 0.0001; // 0.01% as a decimal
 export const SHIPPING_COST = 900.00; // ₦900.00
 
+// --- PRICE ROUNDING HELPER ---
+const roundUpToNearest10 = (price: number): number => {
+    return Math.ceil(price / 10) * 10;
+};
+
 interface CartState {
     items: CartItem[];
     totalItems: number;
@@ -59,17 +64,22 @@ const initialState: CartState = {
 // Helper function to calculate shipping, tax, and final total
 const calculateTotals = (items: CartItem[]) => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalAmount = items.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
+    
+    // Round up individual item totals to nearest 10, then sum
+    const totalAmount = items.reduce((sum, item) => {
+        const itemTotal = roundUpToNearest10(item.amount * item.quantity);
+        return sum + itemTotal;
+    }, 0);
     
     // Calculate shipping
     const isFreeShipping = totalAmount >= FREE_SHIPPING_THRESHOLD;
-    const shippingCost = isFreeShipping ? 0 : SHIPPING_COST;
+    const shippingCost = isFreeShipping ? 0 : roundUpToNearest10(SHIPPING_COST);
     
-    // Calculate tax
-    const taxAmount = totalAmount * TAX_RATE;
+    // Calculate tax and round up
+    const taxAmount = roundUpToNearest10(totalAmount * TAX_RATE);
     
-    // Calculate final total
-    const finalTotal = totalAmount + shippingCost + taxAmount;
+    // Calculate final total and round up
+    const finalTotal = roundUpToNearest10(totalAmount + shippingCost + taxAmount);
     
     return {
         totalItems,
@@ -94,7 +104,13 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
                         : item
                 );
             } else {
-                newItems = [...state.items, { ...action.payload, quantity: 1 }];
+                // Round up the item price when adding to cart
+                const roundedItem = {
+                    ...action.payload,
+                    amount: roundUpToNearest10(action.payload.amount),
+                    quantity: 1
+                };
+                newItems = [...state.items, roundedItem];
             }
 
             const calculatedTotals = calculateTotals(newItems);
@@ -139,7 +155,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
                 items: [],
                 totalItems: 0,
                 totalAmount: 0,
-                shippingCost: SHIPPING_COST,
+                shippingCost: roundUpToNearest10(SHIPPING_COST),
                 taxAmount: 0,
                 finalTotal: 0,
                 isFreeShipping: false,
@@ -158,11 +174,17 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
             };
 
         case 'LOAD_CART': {
-            const calculatedTotals = calculateTotals(action.payload);
+            // Round up prices for items loaded from storage
+            const itemsWithRoundedPrices = action.payload.map(item => ({
+                ...item,
+                amount: roundUpToNearest10(item.amount)
+            }));
+            
+            const calculatedTotals = calculateTotals(itemsWithRoundedPrices);
 
             return {
                 ...state,
-                items: action.payload,
+                items: itemsWithRoundedPrices,
                 ...calculatedTotals,
                 isOpen: false, // Ensure cart is closed on load
             };
@@ -188,6 +210,8 @@ interface CartContextType {
     // New helper functions
     getFreeShippingRemaining: () => number;
     getShippingMessage: () => string;
+    // Expose rounding function
+    roundUpToNearest10: (price: number) => number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -304,11 +328,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const formatPrice = (price: number) => {
+        // Option: Round the displayed price as well
+        const roundedPrice = roundUpToNearest10(price);
         return new Intl.NumberFormat('en-NG', {
             style: 'currency',
             currency: 'NGN',
             minimumFractionDigits: 0,
-        }).format(price);
+        }).format(roundedPrice);
     };
 
     // New helper functions
@@ -341,6 +367,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 showNotification,
                 getFreeShippingRemaining,
                 getShippingMessage,
+                roundUpToNearest10,
             }}
         >
             {children}

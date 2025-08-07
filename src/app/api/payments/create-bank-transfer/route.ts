@@ -27,9 +27,9 @@ interface BankTransferOrderRequest {
 
 // Bank account details - move to environment variables in production
 const BANK_DETAILS = {
-  accountName: process.env.BANK_ACCOUNT_NAME || "Symbol Stores Ltd",
-  accountNumber: process.env.BANK_ACCOUNT_NUMBER || "0123456789",
-  bankName: process.env.BANK_NAME || "GTBank",
+  accountName: process.env.BANK_ACCOUNT_NAME || "SYMBOL STORES LIMITED",
+  accountNumber: process.env.BANK_ACCOUNT_NUMBER || "0036612207",
+  bankName: process.env.BANK_NAME || "Access Bank",
   // You can add multiple bank accounts for different amount ranges
   alternativeBanks: [
     {

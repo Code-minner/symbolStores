@@ -1,5 +1,5 @@
-// src/lib/hooks/useFlutterwave.ts - Enhanced to pass cart data and full totals to verification
-"use client"; // This hook might be used in client components
+// src/lib/hooks/useFlutterwave.ts - Updated with Order Creation
+"use client";
 
 import { useState } from 'react';
 
@@ -24,14 +24,13 @@ interface FlutterwaveConfig {
     };
 }
 
-// Re-using CartItem from CartContext for consistency
 export interface CartItem {
     id: string;
     itemName: string;
     category: string;
     subcategory: string;
     brand: string;
-    amount: number; // Price per unit
+    amount: number;
     originalPrice?: number;
     imageURL: string;
     slug: string;
@@ -46,22 +45,14 @@ interface PaymentData {
     name: string;
     phone: string;
     address?: string;
-    amount: number; // This is the finalTotal to be paid
+    amount: number;
     orderId: string;
     items: CartItem[];
     userId?: string;
-    // Add new fields for detailed totals
-    totalAmountItemsOnly: number; // Sum of (item.amount * item.quantity)
+    totalAmountItemsOnly: number;
     shippingCost: number;
     taxAmount: number;
-    finalTotal: number; // This should be the same as 'amount' above
-}
-
-interface CustomerVerificationData {
-    name: string;
-    email: string;
-    phone: string;
-    address?: string;
+    finalTotal: number;
 }
 
 interface FlutterwaveResponse {
@@ -95,7 +86,7 @@ interface VerificationResult {
     success: boolean;
     data?: any;
     error?: string;
-    warning?: string; // For cases where payment succeeded but order creation failed
+    warning?: string;
 }
 
 declare global {
@@ -134,6 +125,48 @@ export function useFlutterwavePayment() {
 
             await loadFlutterwaveScript();
 
+            // Generate unique transaction reference
+            const txRef = `FLW_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // 🚀 STEP 1: Create order in database BEFORE payment
+            console.log("🛒 Creating Flutterwave order before payment...");
+            console.log(`👤 Customer: ${paymentData.name} (${paymentData.email})`);
+            console.log(`💰 Amount: ₦${paymentData.finalTotal.toLocaleString()}`);
+            console.log(`🆔 Order ID: ${paymentData.orderId}`);
+            console.log(`📝 Tx Ref: ${txRef}`);
+            
+            const orderResponse = await fetch('/api/orders/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    orderId: paymentData.orderId,
+                    txRef: txRef,
+                    customerName: paymentData.name,
+                    customerEmail: paymentData.email, // ✅ CRITICAL: Save email for order history
+                    customerPhone: paymentData.phone,
+                    customerAddress: paymentData.address,
+                    items: paymentData.items,
+                    totalAmountItemsOnly: paymentData.totalAmountItemsOnly,
+                    shippingCost: paymentData.shippingCost,
+                    taxAmount: paymentData.taxAmount,
+                    finalTotal: paymentData.finalTotal,
+                    paymentMethod: 'flutterwave',
+                    status: 'pending',
+                    userId: paymentData.userId || null, // ✅ null for guests, ID for logged-in
+                }),
+            });
+
+            if (!orderResponse.ok) {
+                const errorData = await orderResponse.json();
+                console.error('❌ Order creation failed:', errorData);
+                throw new Error(`Failed to create order: ${errorData.error || 'Unknown error'}`);
+            }
+
+            const orderResult = await orderResponse.json();
+            console.log("✅ Order created successfully:", orderResult);
+
             // Prepare meta data with cart information
             const metaData: { [key: string]: string | number } = {
                 order_id: paymentData.orderId,
@@ -143,7 +176,6 @@ export function useFlutterwavePayment() {
                 items_count: paymentData.items.length,
                 items_summary: simplifyItemsForMeta(paymentData.items),
                 user_id: paymentData.userId || '',
-                // Add new meta fields for debugging/backend visibility
                 total_amount_items_only: paymentData.totalAmountItemsOnly,
                 shipping_cost: paymentData.shippingCost,
                 tax_amount: paymentData.taxAmount,
@@ -152,8 +184,8 @@ export function useFlutterwavePayment() {
 
             const config: FlutterwaveConfig = {
                 public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY!,
-                tx_ref: `FLW_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                amount: 100, // Use finalTotal here for the actual amount to be charged-----------------------------------
+                tx_ref: txRef, // ✅ Use generated txRef that matches database
+                amount: paymentData.finalTotal, // ✅ FIXED: Use actual total instead of hardcoded
                 currency: 'NGN',
                 payment_options: 'card,mobilemoney,ussd,banktransfer',
                 customer: {
@@ -162,7 +194,7 @@ export function useFlutterwavePayment() {
                     name: paymentData.name,
                 },
                 customizations: {
-                    title: process.env.NEXT_PUBLIC_APP_NAME || 'Your Store',
+                    title: process.env.NEXT_PUBLIC_APP_NAME || 'Symbol Stores',
                     description: `Payment for order ${paymentData.orderId}`,
                 },
                 meta: metaData,
@@ -172,38 +204,28 @@ export function useFlutterwavePayment() {
                 window.FlutterwaveCheckout({
                     ...config,
                     callback: async (response: FlutterwaveResponse) => {
-                        console.log('Flutterwave response:', response);
+                        console.log('✅ Flutterwave payment response:', response);
 
                         if (response.status === 'successful') {
                             try {
-                                // Pass all relevant data to verification
+                                // ✅ STEP 2: Verify payment and update order
+                                console.log("🔍 Verifying payment with backend...");
                                 const verificationResult = await verifyPayment(
                                     response.transaction_id,
-                                    paymentData.items,
-                                    { // customerData
-                                        name: paymentData.name,
-                                        email: paymentData.email,
-                                        phone: paymentData.phone,
-                                        address: paymentData.address
-                                    },
-                                    paymentData.userId,
-                                    // Pass the calculated totals explicitly
-                                    paymentData.totalAmountItemsOnly,
-                                    paymentData.shippingCost,
-                                    paymentData.taxAmount,
-                                    paymentData.finalTotal
+                                    txRef
                                 );
 
                                 setIsProcessing(false);
 
                                 if (verificationResult.success) {
+                                    console.log("🎉 Payment verification successful!");
                                     resolve({
                                         success: true,
                                         data: {
                                             orderId: verificationResult.data?.orderId || paymentData.orderId,
                                             transaction_id: response.transaction_id,
                                             tx_ref: response.tx_ref,
-                                            orderStatus: verificationResult.data?.orderStatus,
+                                            orderStatus: verificationResult.data?.status,
                                             emailSent: verificationResult.data?.emailSent,
                                             adminEmailSent: verificationResult.data?.adminEmailSent,
                                             verificationData: verificationResult.data,
@@ -211,27 +233,15 @@ export function useFlutterwavePayment() {
                                     });
                                 } else {
                                     const errorMsg = verificationResult.warning || verificationResult.error || 'Payment verification failed';
+                                    console.error("❌ Payment verification failed:", errorMsg);
                                     setError(errorMsg);
-
-                                    // If there's a warning, it means payment succeeded but order creation failed
-                                    if (verificationResult.warning) {
-                                        resolve({
-                                            success: true,
-                                            data: {
-                                                orderId: verificationResult.data?.orderId || `TMP-${response.tx_ref}`,
-                                                transaction_id: response.transaction_id,
-                                                tx_ref: response.tx_ref,
-                                                verificationData: verificationResult.data,
-                                            },
-                                        });
-                                    } else {
-                                        reject({
-                                            success: false,
-                                            error: errorMsg
-                                        });
-                                    }
+                                    reject({
+                                        success: false,
+                                        error: errorMsg
+                                    });
                                 }
                             } catch (error) {
+                                console.error("❌ Payment verification error:", error);
                                 setIsProcessing(false);
                                 setError('Payment verification error');
                                 reject({
@@ -240,6 +250,7 @@ export function useFlutterwavePayment() {
                                 });
                             }
                         } else {
+                            console.error("❌ Payment was not successful:", response.status);
                             setIsProcessing(false);
                             setError('Payment was not successful');
                             reject({
@@ -250,7 +261,7 @@ export function useFlutterwavePayment() {
                     },
                     onclose: () => {
                         setIsProcessing(false);
-                        console.log('Payment modal closed by user');
+                        console.log('⚠️ Payment modal closed by user');
                         reject({
                             success: false,
                             error: 'Payment cancelled by user'
@@ -261,6 +272,7 @@ export function useFlutterwavePayment() {
         } catch (error) {
             setIsProcessing(false);
             const errorMessage = error instanceof Error ? error.message : 'Payment initialization failed';
+            console.error('❌ Payment initialization error:', errorMessage);
             setError(errorMessage);
             throw {
                 success: false,
@@ -269,53 +281,34 @@ export function useFlutterwavePayment() {
         }
     };
 
-    // Enhanced verification function that passes cart data and full totals
+    // ✅ Simplified verification function
     const verifyPayment = async (
         transactionId: string,
-        cartItems: CartItem[],
-        customerData: CustomerVerificationData, // Changed to specific interface
-        userId: string | undefined,
-        // New parameters for calculated totals
-        totalAmountItemsOnly: number,
-        shippingCost: number,
-        taxAmount: number,
-        finalTotal: number
+        txRef: string
     ): Promise<VerificationResult> => {
         try {
-            console.log("Sending verification request to backend with:", {
+            console.log("📡 Sending verification request to backend:", {
                 transaction_id: transactionId,
-                cart_items: cartItems,
-                customer_data: customerData,
-                user_id: userId,
-                total_amount_items_only: totalAmountItemsOnly,
-                shipping_cost: shippingCost,
-                tax_amount: taxAmount,
-                final_total: finalTotal,
+                tx_ref: txRef,
             });
 
-            const response = await fetch('/api/verify-flutterwave-payment', {
+            // ✅ Call your existing verification API
+            const response = await fetch('/api/payments/verify-flutterwave-payment', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     transaction_id: transactionId,
-                    cart_items: cartItems,
-                    customer_data: customerData,
-                    user_id: userId,
-                    // Pass the calculated totals to the backend
-                    total_amount_items_only: totalAmountItemsOnly,
-                    shipping_cost: shippingCost,
-                    tax_amount: taxAmount,
-                    final_total: finalTotal,
+                    tx_ref: txRef,
                 }),
             });
 
             const result = await response.json();
-            console.log("Backend verification response:", result);
+            console.log("📨 Backend verification response:", result);
             return result;
         } catch (error) {
-            console.error('Payment verification error:', error);
+            console.error('❌ Payment verification error:', error);
             return { success: false, error: 'Verification failed' };
         }
     };

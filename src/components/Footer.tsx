@@ -171,18 +171,29 @@ export default function Footer() {
           {/* Privacy and Terms */}
           <div>
             <h2 style={styles.mainHeading}>Privacy and Terms</h2>
-            <h3 style={styles.minisubHeading}>Terms & Services</h3>
-            <h3 style={styles.minisubHeading}>Privacy Policy</h3>
-            <h3 style={styles.minisubHeading}>Cookie Policy</h3>
+            <a href="/terms-and-service">
+              <h3 style={styles.minisubHeading}>Terms & Services</h3>
+            </a>
+            <a href="/privacy-policy">
+              <h3 style={styles.minisubHeading}>Privacy Policy</h3>
+            </a>
           </div>
 
           {/* Help */}
           <div>
             <h2 style={styles.mainHeading}>Help</h2>
-            <h3 style={styles.minisubHeading}>FAQ</h3>
-            <h3 style={styles.minisubHeading}>Support</h3>
-            <h3 style={styles.minisubHeading}>Contact Us</h3>
-            <h3 style={styles.minisubHeading}>Returns</h3>
+            <a href="/dashboard?tab=profile">
+              <h3 style={styles.minisubHeading}>Dashboard</h3>
+            </a>
+            <a href="/dashboard?tab=track-order">
+              <h3 style={styles.minisubHeading}>Track Order</h3>
+            </a>
+            <a href="/dashboard?tab=order-history">
+              <h3 style={styles.minisubHeading}>Order History</h3>
+            </a>
+            <a href="/contact">
+              <h3 style={styles.minisubHeading}>Contact Us</h3>
+            </a>
           </div>
 
           {/* Newsletter */}

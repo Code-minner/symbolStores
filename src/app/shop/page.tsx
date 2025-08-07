@@ -36,7 +36,6 @@ function ShopContent() {
 
   // Brands list
   const allBrands = [
-    "Gotv",
     "Haier Thermocol",
     "Hisense",
     "Bruhm",
@@ -46,6 +45,7 @@ function ShopContent() {
     "Binatone",
     "Panasonic",
     "Scanfrost",
+    "Gotv",
     "Sony",
     "SUMEC",
     "GREE",
@@ -1253,18 +1253,23 @@ function ShopContent() {
                     <h3 className="text-sm font-medium text-gray-900 mb-3">
                       Browse by Subcategory
                     </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {currentAvailableSubcategories.map((subcategory) => (
-                        <Link
-                          key={subcategory}
-                          href={`/shop?category=${encodeURIComponent(
-                            categoryParam
-                          )}&subcategory=${encodeURIComponent(subcategory)}`}
-                          className="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm hover:border-orange-300 hover:text-orange-600 transition-colors min-h-[36px] flex items-center"
-                        >
-                          {subcategory}
-                        </Link>
-                      ))}
+                    {/* Horizontal Scrollable Container */}
+                    <div className="relative">
+                      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
+                        {currentAvailableSubcategories.map((subcategory) => (
+                          <Link
+                            key={subcategory}
+                            href={`/shop?category=${encodeURIComponent(
+                              categoryParam
+                            )}&subcategory=${encodeURIComponent(subcategory)}`}
+                            className="flex-shrink-0 bg-white border border-gray-200 px-4 py-2 rounded-lg text-sm hover:border-orange-300 hover:text-orange-600 transition-colors min-h-[36px] flex items-center whitespace-nowrap"
+                          >
+                            {subcategory}
+                          </Link>
+                        ))}
+                      </div>
+                      {/* Optional: Add fade effect on scroll edges */}
+                      <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-gray-50 to-transparent pointer-events-none"></div>
                     </div>
                   </div>
                 )}

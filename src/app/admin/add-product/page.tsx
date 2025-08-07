@@ -7,6 +7,7 @@ import { db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { clearAllProductCaches } from "@/lib/cacheUtils";
 
 type FormDataType = {
   itemName: string;
@@ -65,23 +66,102 @@ export default function AdminAddProductPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentUpload, setCurrentUpload] = useState("");
 
-  // Categories and subcategories from your project
+  // Categories and subcategories (updated from database)
   const categories = [
-    "Home & Kitchen",
-    "Furniture",
-    "TV",
     "Generator",
-    "Freezers",
-    "Microwave",
-    "Air Conditioner",
-    "Blender",
     "Audio Bass",
-    "Others",
+    "Microwave",
+    "Stove",
+    "Washing Machine",
+    "Air conditioner",
+    "Freezers",
+    "Refrigerators",
+    "TVs",
+    "Gotv",
+    "WATER DISPENSER",
+    "BLENDER",
+    "YAM PONDER",
+    "DISH WASHER",
+    "stabilizer",
+    "Fornitures",
+    "Fan's",
+    "Home & Kitchen",
+    "Pressing Iron",
+    "Extensions",
   ];
 
   const categorySubItems: { [key: string]: string[] } = {
+    Generator: [
+      "Sound proof generator set",
+      "Manual starter",
+      "Electric and manual starter",
+    ],
+    "Audio Bass": [
+      "Mini Hi-Fi System",
+      "Wireless Speakers",
+      "Sound Bars",
+      "DVD Player",
+      "AV Receiver Systems",
+      "Home Theatre Systems",
+      "Rechargeable Speaker System",
+    ],
+    Microwave: [],
+    Stove: [
+      "Table Top Gas Cooker",
+      "50x50 Cookers",
+      "60x60 cookers",
+      "60x90 Cookers",
+      "90x60 Cookers",
+      "Air Fryer",
+    ],
+    "Washing Machine": [
+      "Front Load Washing Machine",
+      "Top Load Washing Machine",
+      "Automatic Washing Machine",
+      "Wash and Dry",
+      "Commercial Dryer",
+      "Twin Tub Washing Machines",
+      "Tumble Dryer",
+    ],
+    "Air conditioner": [
+      "Portable Air Conditioner",
+      "Inverter Air Conditioner",
+      "Floor Standing Air Conditioner",
+      "Split Air Conditioner",
+    ],
+    Freezers: ["Standing Freezer", "Chest Freezer", "Deep Freezer"],
+    Refrigerators: [
+      "InstaView Door In Door Refrigerator",
+      "Door In Door Refrigerator",
+      "Side By Side Refrigerator",
+      "Bottom Freezer Refrigerator",
+      "Top Freezer Refrigerator",
+      "Single Door Refrigerator",
+      "Double Door Refrigerator",
+    ],
+    TVs: [
+      "Signature TV",
+      "Laser TV",
+      "QNED TV",
+      "OLED TV",
+      "NanoCell TV",
+      "QLED TV",
+      "ULED TV",
+      "UHD TV",
+      "Smart TV",
+      "LED TV",
+      "FHD",
+    ],
+    Gotv: [],
+    "WATER DISPENSER": [],
+    BLENDER: [],
+    "YAM PONDER": [],
+    "DISH WASHER": [],
+    stabilizer: [],
+    Fornitures: [],
+    "Fan's": ["Rechargeable Fan", "Ceiling Fan", "Standing Fan", "Wall Fan"],
     "Home & Kitchen": [
-      "Toast",
+      "Toaster",
       "Air Fryer",
       "Electric Kettle",
       "Griller",
@@ -90,72 +170,12 @@ export default function AdminAddProductPage() {
       "Vacuum Cleaner",
       "Slow Juicer",
       "Jug Kettle",
-      "Coffee Maker",
-      "Sandwich Maker",
-      "Mixer Grinder",
+      "COFFEE MAKER",
+      "SandwichMaker",
+      "MIXER GRINDER",
     ],
-    Furniture: [
-      "Sofa",
-      "Dining Table",
-      "Bed",
-      "Wardrobe",
-      "Chair",
-      "Desk",
-      "Cabinet",
-      "Bookshelf",
-    ],
-    TV: [
-      "LED TV",
-      "OLED TV",
-      "Smart TV",
-      "4K TV",
-      "8K TV",
-      "Android TV",
-      "UHD TV",
-    ],
-    Generator: [
-      "Petrol Generator",
-      "Diesel Generator",
-      "Gas Generator",
-      "Solar Generator",
-      "Inverter Generator",
-      "Manual starter",
-    ],
-    Freezers: [
-      "Chest Freezer",
-      "Upright Freezer",
-      "Mini Freezer",
-      "Deep Freezer",
-      "Bottom Freezer Refrigerator",
-    ],
-    Microwave: [
-      "Solo Microwave",
-      "Grill Microwave",
-      "Convection Microwave",
-      "Built-in Microwave",
-    ],
-    "Air Conditioner": [
-      "Split AC",
-      "Window AC",
-      "Portable AC",
-      "Central AC",
-      "Cassette AC",
-      "Inverter Air Conditioner",
-    ],
-    Blender: [
-      "Hand Blender",
-      "Stand Blender",
-      "Smoothie Blender",
-      "Food Processor",
-    ],
-    "Audio Bass": [
-      "Speakers",
-      "Headphones",
-      "Sound Bar",
-      "Home Theater",
-      "Bluetooth Speaker",
-    ],
-    Others: ["Accessories", "Parts", "Tools", "Gadgets"],
+    "Pressing Iron": ["Dry Iron", "Steam Iron"],
+    Extensions: ["Ac guard"],
   };
 
   // Brands list
@@ -211,6 +231,7 @@ export default function AdminAddProductPage() {
     "Tigmax",
     "ELEPAQ",
     "KEMAGE",
+    "Others",
   ];
 
   const generateSlug = (text: string) =>
@@ -490,10 +511,21 @@ export default function AdminAddProductPage() {
       };
 
       await setDoc(doc(db, "products", itemId), itemData);
-      setUploadProgress(100);
+      setUploadProgress(95);
       setCurrentUpload("Product saved successfully!");
 
-      alert("✅ Product added successfully!");
+      // ✅ ADD THIS: Clear cache so new product shows immediately
+      try {
+        setCurrentUpload("Clearing cache...");
+        await clearAllProductCaches();
+        setUploadProgress(100);
+        setCurrentUpload("Cache cleared!");
+      } catch (cacheError) {
+        console.warn("Cache clearing failed:", cacheError);
+        // Don't fail the whole operation if cache clearing fails
+      }
+
+      alert("✅ Product added and cache cleared!");
 
       // Reset form
       setFormData({

@@ -92,51 +92,128 @@ export default function Header() {
     "Washing Machine",
   ];
 
-  const categorySubItems: { [key: string]: string[] } = {
-    "All Categories": [],
-    "Home & Kitchen": [
-      "Toast",
-      "Air Fryer",
-      "Electric Kettle",
-      "Griller",
-      "Hotplate",
-      "Hand Mixer",
-      "Vacuum Cleaner",
-      "Slow Juicer",
-      "Jug Kettle",
-      "Coffee Maker",
-      "Sandwich Maker",
-      "Mixer Grinder",
-    ],
-    Furniture: ["Sofa", "Dining Table", "Bed", "Wardrobe", "Chair", "Desk"],
-    TV: ["LED TV", "OLED TV", "Smart TV", "4K TV"],
-    Generator: ["Petrol Generator", "Diesel Generator", "Gas Generator"],
-    Freezers: ["Chest Freezer", "Upright Freezer", "Mini Freezer"],
-    Microwave: ["Solo Microwave", "Grill Microwave", "Convection Microwave"],
-    Extensions: [],
-    "Pressing Iron": ["Dry Iron", "Steam Iron"],
-    Stabilizer: [],
-    "Air Conditioner": ["Split AC", "Window AC", "Portable AC"],
-    "Washing Machine": [
-      "Front Load Washing Machine",
-      "Top Load Washing Machine",
-      "Automatic Washing Machine",
-      "Wash and Dry",
-      "Commercial Dryer",
-      "Twin Tub Washing Machines",
-      "Tumble Dryer",
-    ],
-    Stove: [
-      "Table Top Gas Cooker",
-      "50x50 Cookers",
-      "60x60 Cookers",
-      "60x90 Cookers",
-      "90x60 Cookers",
-      "Air Fryer",
-    ],
-    Blender: ["Hand Blender", "Stand Blender", "Smoothie Blender"],
-    "Audio Bass": ["Speakers", "Headphones", "Sound Bar"],
-  };
+const categorySubItems: { [key: string]: string[] } = {
+  "All Categories": [],
+  
+  "Generator": [
+    "Sound proof generator set",
+    "Manual starter",
+    "Electric and manual starter"
+  ],
+  
+  "Audio Bass": [
+    "Mini Hi-Fi System",
+    "Wireless Speakers",
+    "Sound Bars",
+    "DVD Player",
+    "AV Receiver Systems",
+    "Home Theatre Systems",
+    "Rechargeable Speaker System"
+  ],
+  
+  "Stove": [
+    "Table Top Gas Cooker",
+    "50x50 Cookers",
+    "60x60 cookers",
+    "60x90 Cookers",
+    "90x60 Cookers",
+    "Air Fryer"
+  ],
+  
+  "Washing Machine": [
+    "Front Load Washing Machine",
+    "Top Load Washing Machine",
+    "Automatic Washing Machine",
+    "Wash and Dry",
+    "Commercial Dryer",
+    "Twin Tub Washing Machines",
+    "Tumble Dryer"
+  ],
+  
+  "Air conditioner": [
+    "Portable Air Conditioner",
+    "Inverter Air Conditioner",
+    "Floor Standing Air Conditioner",
+    "Split Air Conditioner"
+  ],
+  
+  "Freezers": [
+    "Standing Freezer",
+    "Chest Freezer",
+    "Deep Freezer"
+  ],
+  
+  "Refrigerators": [
+    "InstaView Door In Door Refrigerator",
+    "Door In Door Refrigerator",
+    "Side By Side Refrigerator",
+    "Bottom Freezer Refrigerator",
+    "Top Freezer Refrigerator",
+    "Single Door Refrigerator",
+    "Double Door Refrigerator"
+  ],
+  
+  "TVs": [
+    "Signature TV",
+    "Laser TV",
+    "QNED TV",
+    "OLED TV",
+    "NanoCell TV",
+    "QLED TV",
+    "ULED TV",
+    "UHD TV",
+    "Smart TV",
+    "LED TV",
+    "FHD"
+  ],
+
+    "Fan's": [
+    "Rechargeable Fan",
+    "Ceiling Fan",
+    "Standing Fan",
+    "Wall Fan"
+  ],
+  
+  "Home & Kitchen": [
+    "Toaster",
+    "Air Fryer",
+    "Electric Kettle",
+    "Griller",
+    "Hotplate",
+    "Hand Mixer",
+    "Vacuum Cleaner",
+    "Slow Juicer",
+    "Jug Kettle",
+    "COFFEE MAKER",
+    "SandwichMaker",
+    "MIXER GRINDER"
+  ],
+  
+  "Pressing Iron": [
+    "Dry Iron",
+    "Steam Iron"
+  ],
+  
+  "Extensions": [
+    "Ac guard"
+  ],
+
+    
+  "Microwave": [],
+  
+  "WATER DISPENSER": [],
+  
+  "BLENDER": [],
+  
+  "YAM PONDER": [],
+  
+  "DISH WASHER": [],
+  
+  "stabilizer": [],
+  
+  "Fornitures": [],
+  
+};
 
   const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -351,8 +428,7 @@ export default function Header() {
       )}
 
       {/* Top Header */}
-      <div
-        className="w-full px-4 py-4 lg:mx-auto"
+      <div className="w-full px-4 py-4 lg:mx-auto sticky top-0 z-[100]" 
         style={{ backgroundColor: "var(--header_background)" }}
       >
         <div className="flex items-center max-w-[1400px] relative m-auto justify-between gap-4 py-2">
@@ -826,7 +902,7 @@ export default function Header() {
                     onClick={closeCart}
                     className="block w-full text-center bg-gray-300 text-gray-700 py-3 mb-4  rounded-full hover:bg-gray-500 transition-colors text-lg font-semibold"
                   >
-                    Proceed to Checkout
+                    Proceed to Cart
                   </Link>
 
                   <Link

@@ -195,3 +195,29 @@ body {
 .animate-slideInDown {
   animation: slideInDown 0.3s ease-out forwards; /* 0.3s for speed */
 }
+
+
+  /* Custom scrollbar styles */
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 2px;
+  }
+  
+  .scrollbar-track-gray-100::-webkit-scrollbar-track {
+    background-color: #f3f4f6;
+    border-radius: 2px;
+  }
+  
+  .hover\\:scrollbar-thumb-gray-400:hover::-webkit-scrollbar-thumb {
+    background-color: #9ca3af;
+  }
+  
+  /* Hide scrollbar for Firefox */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db #f3f4f6;
+  }

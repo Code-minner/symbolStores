@@ -7,6 +7,7 @@ export interface OrderData {
   totalAmount: number;
   items: CartItem[];
   orderNotes?: string;
+  userId: string; // ← ADD THIS
 }
 
 export interface CartItem {
@@ -19,7 +20,7 @@ export interface CartItem {
 
 export interface PaymentSuccessData {
   orderId: string;
-  paymentMethod: 'flutterwave' | 'bank_transfer';
+  paymentMethod: "flutterwave" | "bank_transfer";
   transactionId?: string;
   reference?: string;
   orderReference?: string;
@@ -66,6 +67,7 @@ export interface BankTransferOrderData {
     totalAmount: number;
     items: CartItem[];
     orderNotes?: string;
+    userId: string; // ← ADD THIS
   };
   customerInfo: {
     name: string;

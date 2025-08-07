@@ -142,7 +142,7 @@ function AuthContent() {
   return (
     <>
       {/* Fixed Breadcrumb */}
-      <div className="w-[100%] overflow-x-auto bg-gray-100 py-3 pr-4 mr-4">
+      <div className="w-[100%] overflow-x-auto bg-gray-100 py-3 pr-4 mr-4 pl-4">
         <nav className="w-full max-w-[1400px] bg-gray-100 mx-auto flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>

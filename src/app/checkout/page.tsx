@@ -538,7 +538,7 @@ export default function CheckoutPage() {
                   {!state.isFreeShipping && (
                     <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <p className="text-sm text-blue-800 font-medium">
-                        🚚 Free Shipping After Purchase Order of ₦990,000.00
+                        Free Shipping After Purchase Order of ₦990,000.00
                       </p>
                       <p className="text-xs text-blue-600 mt-1">
                         Add{" "}

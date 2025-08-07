@@ -1,13 +1,18 @@
-// src/app/api/payments/flutterwave/verify-payment/route.ts
+// src/app/api/payments/verify-flutterwave-payment/route.ts - FIXED VERSION WITH ROUNDING
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp  } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { EmailService } from '@/lib/email'; // Import your EmailService
+import { EmailService } from '@/lib/email';
+
+// --- PRICE ROUNDING HELPER (same as CartContext) ---
+const roundUpToNearest10 = (price: number): number => {
+  return Math.ceil(price / 10) * 10;
+};
 
 // Define interfaces for clarity
 interface FlutterwaveVerificationRequestBody {
   transaction_id?: string; // Flutterwave's transaction ID
-  tx_ref: string;          // Your unique transaction reference (orderId)
+  tx_ref: string;          // Your unique transaction reference
 }
 
 interface FlutterwaveVerificationResponse {
@@ -30,17 +35,20 @@ interface FlutterwaveVerificationResponse {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🚀 Flutterwave payment verification API called');
+  console.log('🚀 Flutterwave payment verification API called (WITH ROUNDING)');
 
   try {
     const { transaction_id, tx_ref }: FlutterwaveVerificationRequestBody = await request.json();
 
-    if (!tx_ref) {
-      console.error('❌ Validation failed: tx_ref is required for Flutterwave verification.');
-      return NextResponse.json({ success: false, error: 'Transaction reference (tx_ref) is required.' }, { status: 400 });
+    if (!transaction_id || !tx_ref) {
+      console.error('❌ Validation failed: transaction_id and tx_ref are required for Flutterwave verification.');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Transaction ID and transaction reference (tx_ref) are required.' 
+      }, { status: 400 });
     }
 
-    console.log(`🔍 Verifying Flutterwave transaction for tx_ref: ${tx_ref}, transaction_id: ${transaction_id || 'N/A'}`);
+    console.log(`🔍 Verifying Flutterwave transaction for tx_ref: ${tx_ref}, transaction_id: ${transaction_id}`);
 
     // 1. Call Flutterwave's verification endpoint
     const flutterwaveVerifyUrl = `https://api.flutterwave.com/v3/transactions/${transaction_id}/verify`;
@@ -50,7 +58,7 @@ export async function POST(request: NextRequest) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`, // Use your secret key
+        'Authorization': `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
       },
     });
 
@@ -84,31 +92,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Flutterwave data missing.' }, { status: 500 });
     }
 
-    // 3. Find the corresponding order in Firestore using tx_ref (which should be your orderId)
-    const orderId = tx_ref; // Assuming tx_ref is your orderId
-    console.log(`🔍 Finding order in Firestore with orderId (tx_ref): ${orderId}`);
+    // 3. 🚀 FIXED: Find the corresponding order in Firestore using tx_ref
+    console.log(`🔍 Finding order in Firestore with txRef: ${tx_ref}`);
 
-    const ordersRef = collection(db, 'flutterwaveOrders'); // Assuming a 'flutterwaveOrders' collection
-    const q = query(ordersRef, where('orderId', '==', orderId));
+    const ordersRef = collection(db, 'orders'); // ✅ FIXED: Use orders collection
+    const q = query(ordersRef, where('txRef', '==', tx_ref)); // ✅ FIXED: Query by txRef
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      console.error(`❌ Order not found in Firestore for orderId: ${orderId}`);
+      console.error(`❌ Order not found in Firestore for txRef: ${tx_ref}`);
       return NextResponse.json({ success: false, error: 'Order not found in database.' }, { status: 404 });
     }
 
     const orderDoc = querySnapshot.docs[0];
     const orderData = orderDoc.data();
 
-    // 4. Validate against your stored order data
-    // Ensure the amount matches (within a small tolerance)
-    const storedAmount = typeof orderData.amount === 'number' ? orderData.amount : 0;
-    const receivedAmount = typeof verifiedPaymentData.amount === 'number' ? verifiedPaymentData.amount : 0;
+    // 4. Validate against your stored order data (WITH ROUNDING)
+    // Ensure the amount matches (within a small tolerance) - apply rounding to both amounts
+    const storedAmountRaw = typeof orderData.finalTotal === 'number' ? orderData.finalTotal : (orderData.amount || 0);
+    const receivedAmountRaw = typeof verifiedPaymentData.amount === 'number' ? verifiedPaymentData.amount : 0;
+    
+    // Apply rounding to both amounts before comparison (same as CartContext logic)
+    const storedAmount = roundUpToNearest10(storedAmountRaw);
+    const receivedAmount = roundUpToNearest10(receivedAmountRaw);
     const currency = verifiedPaymentData.currency;
+
+    console.log(`💰 Amount comparison (rounded): Stored: ₦${storedAmount}, Received: ₦${receivedAmount}`);
 
     if (Math.abs(storedAmount - receivedAmount) > 0.01 || orderData.currency !== currency) {
       console.error('❌ Amount or currency mismatch between stored order and Flutterwave response:', {
-        storedAmount, receivedAmount, storedCurrency: orderData.currency, receivedCurrency: currency
+        storedAmountRaw, storedAmount, receivedAmountRaw, receivedAmount, storedCurrency: orderData.currency, receivedCurrency: currency
       });
       // It's critical to NOT confirm the order if amounts don't match
       return NextResponse.json({
@@ -120,17 +133,21 @@ export async function POST(request: NextRequest) {
 
     // Check if order is already confirmed to prevent double processing
     if (orderData.status === 'confirmed') {
-      console.warn(`⚠️ Order ${orderId} is already confirmed. Skipping update.`);
+      console.warn(`⚠️ Order ${orderData.orderId} is already confirmed. Skipping update.`);
       return NextResponse.json({
         success: true,
         message: 'Payment already verified and order confirmed.',
-        data: { orderId, status: 'confirmed', transactionId: verifiedPaymentData.id }
+        data: { 
+          orderId: orderData.orderId, 
+          status: 'confirmed', 
+          transactionId: verifiedPaymentData.id 
+        }
       });
     }
 
-    // 5. Update order status in Firestore
-    console.log(`💾 Updating order ${orderId} status to 'confirmed'`); // Corrected line
-    await updateDoc(doc(db, 'flutterwaveOrders', orderDoc.id), {
+    // 5. 🚀 FIXED: Update order status in Firestore
+    console.log(`💾 Updating order ${orderData.orderId} status to 'confirmed'`);
+    await updateDoc(doc(db, 'orders', orderDoc.id), { // ✅ FIXED: Use orders collection
       status: 'confirmed',
       paymentVerified: true,
       transactionId: verifiedPaymentData.id,
@@ -138,21 +155,27 @@ export async function POST(request: NextRequest) {
       verifiedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    console.log(`✅ Order ${orderId} updated to 'confirmed' in Firestore.`);
+    console.log(`✅ Order ${orderData.orderId} updated to 'confirmed' in Firestore.`);
 
-    // 6. Send email notifications
+    // 6. Send email notifications (use rounded stored amount)
     const customerEmailData = {
-      orderId: orderId,
-      customerName: verifiedPaymentData.customer.name || orderData.customerName,
-      customerEmail: verifiedPaymentData.customer.email || orderData.customerEmail,
-      customerPhone: verifiedPaymentData.customer.phone_number || orderData.customerPhone,
-      amount: storedAmount, // Use your stored amount as the source of truth
-      items: orderData.items, // Get items from stored order data
+      orderId: orderData.orderId,
+      customerName: orderData.customerName || verifiedPaymentData.customer.name,
+      customerEmail: orderData.customerEmail || verifiedPaymentData.customer.email,
+      customerPhone: orderData.customerPhone || verifiedPaymentData.customer.phone_number,
+      amount: storedAmount, // Use rounded stored amount as the source of truth
+      items: orderData.items || [], // Get items from stored order data
+      totalAmountItemsOnly: orderData.totalAmountItemsOnly || storedAmount,
+      shippingCost: orderData.shippingCost || 0,
+      taxAmount: orderData.taxAmount || 0,
+      finalTotal: storedAmount, // Use rounded amount
+      isFreeShipping: orderData.isFreeShipping || false,
       // No bankDetails for Flutterwave orders
     };
 
     let customerEmailSent = false;
     try {
+      console.log('📧 Sending customer confirmation email...');
       const { success } = await EmailService.sendOrderConfirmation(customerEmailData);
       customerEmailSent = success;
       if (!success) console.error('❌ Failed to send customer confirmation email for Flutterwave order.');
@@ -162,24 +185,25 @@ export async function POST(request: NextRequest) {
 
     let adminEmailSent = false;
     try {
-      const { success } = await EmailService.sendAdminNotification(customerEmailData); // Use the same data structure
+      console.log('📧 Sending admin notification email...');
+      const { success } = await EmailService.sendAdminNotification(customerEmailData);
       adminEmailSent = success;
       if (!success) console.error('❌ Failed to send admin notification email for Flutterwave order.');
     } catch (emailError) {
       console.error('❌ Error sending admin notification email for Flutterwave order:', emailError);
     }
 
-    console.log('🎉 Flutterwave payment verification successful!');
+    console.log('🎉 Flutterwave payment verification successful (WITH ROUNDING)!');
 
     return NextResponse.json({
       success: true,
       message: 'Payment verified and order confirmed!',
       data: {
-        orderId: orderId,
+        orderId: orderData.orderId,
         status: 'confirmed',
         transactionId: verifiedPaymentData.id,
         flwRef: verifiedPaymentData.flw_ref,
-        amount: storedAmount,
+        amount: storedAmount, // Use rounded amount in response
         emailSent: customerEmailSent,
         adminEmailSent: adminEmailSent,
       },

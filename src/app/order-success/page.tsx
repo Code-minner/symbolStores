@@ -3,18 +3,34 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Icon } from '@iconify/react';
-import Link from 'next/link';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import TransactionReferenceModal from '@/components/TransactionReferenceModal';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { Icon } from "@iconify/react";
+import Link from "next/link";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import TransactionReferenceModal from "@/components/TransactionReferenceModal";
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 
 // Import the constants from CartContext
-import { FREE_SHIPPING_THRESHOLD, TAX_RATE, SHIPPING_COST } from '@/lib/CartContext';
+import {
+  FREE_SHIPPING_THRESHOLD,
+  TAX_RATE,
+  SHIPPING_COST,
+} from "@/lib/CartContext";
+
+// --- PRICE ROUNDING HELPER (same as CartContext) ---
+const roundUpToNearest10 = (price: number): number => {
+  return Math.ceil(price / 10) * 10;
+};
 
 interface OrderItem {
   id: string;
@@ -51,21 +67,34 @@ interface OrderData {
   isFreeShipping: boolean;
 }
 
-// Helper function to calculate totals (same logic as CartContext)
-const calculateOrderTotals = (items: OrderItem[], providedSubtotal?: number) => {
-  // Calculate items subtotal
-  const totalAmountItemsOnly = providedSubtotal ?? items.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
-  
-  // Calculate shipping
+// ✅ UPDATED: Helper function to calculate totals WITH ROUNDING (same logic as CartContext)
+const calculateOrderTotals = (
+  items: OrderItem[],
+  providedSubtotal?: number
+) => {
+  // Calculate subtotal by rounding each item total, then sum (same as CartContext)
+  const totalAmountItemsOnly = providedSubtotal ?? 
+    items.reduce((sum, item) => {
+      const itemTotal = roundUpToNearest10(item.amount * item.quantity);
+      return sum + itemTotal;
+    }, 0);
+
+  // Calculate shipping with rounding
   const isFreeShipping = totalAmountItemsOnly >= FREE_SHIPPING_THRESHOLD;
-  const shippingCost = isFreeShipping ? 0 : SHIPPING_COST;
-  
-  // Calculate tax on subtotal only (not including shipping)
-  const taxAmount = totalAmountItemsOnly * TAX_RATE;
-  
-  // Calculate final total
-  const finalTotal = totalAmountItemsOnly + shippingCost + taxAmount;
-  
+  const shippingCost = isFreeShipping ? 0 : roundUpToNearest10(SHIPPING_COST);
+
+  // Calculate tax with rounding
+  const taxAmount = roundUpToNearest10(totalAmountItemsOnly * TAX_RATE);
+
+  // Calculate final total with rounding
+  const finalTotal = roundUpToNearest10(totalAmountItemsOnly + shippingCost + taxAmount);
+
+  console.log("💰 Order Success Page - Totals Breakdown (WITH ROUNDING):");
+  console.log(`   Subtotal: ₦${totalAmountItemsOnly.toFixed(2)}`);
+  console.log(`   Shipping: ₦${shippingCost.toFixed(2)} ${isFreeShipping ? "(FREE!)" : ""}`);
+  console.log(`   Tax: ₦${taxAmount.toFixed(2)}`);
+  console.log(`   FINAL TOTAL: ₦${finalTotal.toFixed(2)}`);
+
   return {
     totalAmountItemsOnly,
     shippingCost,
@@ -78,20 +107,23 @@ const calculateOrderTotals = (items: OrderItem[], providedSubtotal?: number) => 
 // Helper function to ensure order data has proper calculated totals
 const ensureCalculatedTotals = (orderData: Partial<OrderData>): OrderData => {
   const items = orderData.items || [];
-  
-  // If we already have all calculated totals, use them
-  if (orderData.finalTotal !== undefined && 
-      orderData.totalAmountItemsOnly !== undefined && 
-      orderData.shippingCost !== undefined && 
-      orderData.taxAmount !== undefined &&
-      orderData.isFreeShipping !== undefined) {
+
+  // If we already have all calculated totals, use them (but ensure they're rounded)
+  if (
+    orderData.finalTotal !== undefined &&
+    orderData.totalAmountItemsOnly !== undefined &&
+    orderData.shippingCost !== undefined &&
+    orderData.taxAmount !== undefined &&
+    orderData.isFreeShipping !== undefined
+  ) {
+    // ✅ UPDATED: Ensure stored totals are also rounded (in case they came from old data)
     return {
-      orderId: orderData.orderId || '',
+      orderId: orderData.orderId || "",
       amount: orderData.amount || orderData.totalAmountItemsOnly,
-      status: orderData.status || 'pending',
-      paymentMethod: orderData.paymentMethod || 'unknown',
-      customerName: orderData.customerName || 'Guest',
-      customerEmail: orderData.customerEmail || 'guest@example.com',
+      status: orderData.status || "pending",
+      paymentMethod: orderData.paymentMethod || "unknown",
+      customerName: orderData.customerName || "Guest",
+      customerEmail: orderData.customerEmail || "guest@example.com",
       items: items,
       bankDetails: orderData.bankDetails,
       paymentVerified: orderData.paymentVerified || false,
@@ -99,24 +131,27 @@ const ensureCalculatedTotals = (orderData: Partial<OrderData>): OrderData => {
       verificationStatus: orderData.verificationStatus,
       transactionId: orderData.transactionId,
       reference: orderData.reference,
-      totalAmountItemsOnly: orderData.totalAmountItemsOnly,
-      shippingCost: orderData.shippingCost,
-      taxAmount: orderData.taxAmount,
-      finalTotal: orderData.finalTotal,
+      totalAmountItemsOnly: roundUpToNearest10(orderData.totalAmountItemsOnly),
+      shippingCost: roundUpToNearest10(orderData.shippingCost),
+      taxAmount: roundUpToNearest10(orderData.taxAmount),
+      finalTotal: roundUpToNearest10(orderData.finalTotal),
       isFreeShipping: orderData.isFreeShipping,
     };
   }
-  
-  // Otherwise, calculate them
-  const calculatedTotals = calculateOrderTotals(items, orderData.totalAmountItemsOnly);
-  
+
+  // Otherwise, calculate them with rounding
+  const calculatedTotals = calculateOrderTotals(
+    items,
+    orderData.totalAmountItemsOnly
+  );
+
   return {
-    orderId: orderData.orderId || '',
+    orderId: orderData.orderId || "",
     amount: orderData.amount || calculatedTotals.totalAmountItemsOnly,
-    status: orderData.status || 'pending',
-    paymentMethod: orderData.paymentMethod || 'unknown',
-    customerName: orderData.customerName || 'Guest',
-    customerEmail: orderData.customerEmail || 'guest@example.com',
+    status: orderData.status || "pending",
+    paymentMethod: orderData.paymentMethod || "unknown",
+    customerName: orderData.customerName || "Guest",
+    customerEmail: orderData.customerEmail || "guest@example.com",
     items: items,
     bankDetails: orderData.bankDetails,
     paymentVerified: orderData.paymentVerified || false,
@@ -124,7 +159,7 @@ const ensureCalculatedTotals = (orderData: Partial<OrderData>): OrderData => {
     verificationStatus: orderData.verificationStatus,
     transactionId: orderData.transactionId,
     reference: orderData.reference,
-    ...calculatedTotals, // Spread the calculated totals (all defined)
+    ...calculatedTotals, // Spread the calculated totals (all defined and rounded)
   };
 };
 
@@ -153,11 +188,11 @@ function OrderSuccessContent() {
   const [showReferenceModal, setShowReferenceModal] = useState(false);
 
   useEffect(() => {
-    const orderId = searchParams.get('orderId');
-    const paymentMethod = searchParams.get('method');
-    const status = searchParams.get('status');
-    const amount = searchParams.get('amount');
-    const orderDataParam = searchParams.get('orderData');
+    const orderId = searchParams.get("orderId");
+    const paymentMethod = searchParams.get("method");
+    const status = searchParams.get("status");
+    const amount = searchParams.get("amount");
+    const orderDataParam = searchParams.get("orderData");
 
     const loadOrder = async () => {
       setLoading(true);
@@ -166,39 +201,50 @@ function OrderSuccessContent() {
         // Path 1: Data passed directly via URL params
         try {
           const parsedData = JSON.parse(decodeURIComponent(orderDataParam));
-          
+
           // Create order data with proper structure
           const orderData: Partial<OrderData> = {
             orderId: parsedData.orderReference || parsedData.orderId,
             amount: parseFloat(amount || parsedData.total_amount || 0),
-            status: status || parsedData.orderStatus || 'pending',
-            paymentMethod: paymentMethod || parsedData.paymentMethod || 'bank_transfer',
-            customerName: parsedData.customer_data?.name || parsedData.customerName || 'Guest',
-            customerEmail: parsedData.customer_data?.email || parsedData.customerEmail || 'guest@example.com',
+            status: status || parsedData.orderStatus || "pending",
+            paymentMethod:
+              paymentMethod || parsedData.paymentMethod || "bank_transfer",
+            customerName:
+              parsedData.customer_data?.name ||
+              parsedData.customerName ||
+              "Guest",
+            customerEmail:
+              parsedData.customer_data?.email ||
+              parsedData.customerEmail ||
+              "guest@example.com",
             items: parsedData.cart_items || parsedData.items || [],
             bankDetails: parsedData.bank_details || parsedData.bankDetails,
             paymentVerified: parsedData.paymentVerified || false,
             transactionReference: parsedData.transactionReference,
             verificationStatus: parsedData.verificationStatus,
             // Use provided calculated totals if available
-            totalAmountItemsOnly: parsedData.total_amount_items_only || parsedData.totalAmountItemsOnly,
+            totalAmountItemsOnly:
+              parsedData.total_amount_items_only ||
+              parsedData.totalAmountItemsOnly,
             shippingCost: parsedData.shipping_cost || parsedData.shippingCost,
             taxAmount: parsedData.tax_amount || parsedData.taxAmount,
             finalTotal: parsedData.total_amount || parsedData.finalTotal,
           };
 
-          // Ensure all totals are properly calculated
+          // ✅ UPDATED: Ensure all totals are properly calculated WITH ROUNDING
           const populatedOrder = ensureCalculatedTotals(orderData);
           setOrder(populatedOrder);
 
-          if (populatedOrder.paymentMethod === 'bank_transfer' &&
-              !populatedOrder.paymentVerified &&
-              !populatedOrder.transactionReference) {
+          if (
+            populatedOrder.paymentMethod === "bank_transfer" &&
+            !populatedOrder.paymentVerified &&
+            !populatedOrder.transactionReference
+          ) {
             setTimeout(() => setShowReferenceModal(true), 1000);
           }
         } catch (err) {
-          console.error('Failed to parse order data from URL param:', err);
-          setError('Invalid order data format.');
+          console.error("Failed to parse order data from URL param:", err);
+          setError("Invalid order data format.");
         } finally {
           setLoading(false);
         }
@@ -206,7 +252,7 @@ function OrderSuccessContent() {
         // Path 2: Order ID provided, fetch from Firestore
         await fetchOrderFromFirestore(orderId, paymentMethod);
       } else {
-        setError('No order information provided.');
+        setError("No order information provided.");
         setLoading(false);
       }
     };
@@ -214,70 +260,79 @@ function OrderSuccessContent() {
     loadOrder();
   }, [searchParams]);
 
+  // In your order-success/page.tsx - Replace the fetchOrderFromFirestore function
   const fetchOrderFromFirestore = async (id: string, method: string | null) => {
     try {
-      let collectionName = '';
-      if (method === 'bank_transfer') {
-        collectionName = 'bankTransferOrders';
-      } else if (method === 'flutterwave') {
-        collectionName = 'flutterwaveOrders';
+      let collectionName = "";
+
+      // ✅ FIXED: Determine correct collection based on payment method
+      if (method === "bank_transfer") {
+        collectionName = "bankTransferOrders";
+      } else if (method === "flutterwave") {
+        collectionName = "orders"; // ✅ FIXED: Flutterwave orders go to 'orders' collection
       } else {
-        collectionName = 'bankTransferOrders';
-        console.warn('Payment method not specified, defaulting to bankTransferOrders collection.');
+        // Default to bank transfer if method is not specified
+        collectionName = "bankTransferOrders";
+        console.warn(
+          "Payment method not specified, defaulting to bankTransferOrders collection."
+        );
       }
 
-      if (!collectionName) {
-        setError('Could not determine order type for fetching.');
-        return;
-      }
-      
+      console.log(`🔍 Fetching order ${id} from ${collectionName} collection`);
+
       const orderQuery = query(
         collection(db, collectionName),
-        where('orderId', '==', id)
+        where("orderId", "==", id)
       );
-      
+
       const orderSnapshot = await getDocs(orderQuery);
-      
+
       if (!orderSnapshot.empty) {
         const orderDoc = orderSnapshot.docs[0];
         const fetchedData = orderDoc.data();
 
+        console.log(`✅ Order found in ${collectionName}:`, fetchedData);
+
         // Create order data from Firestore
         const orderData: Partial<OrderData> = {
           orderId: fetchedData.orderId || id,
-          amount: fetchedData.amount || 0,
-          status: fetchedData.status || 'unknown',
-          paymentMethod: fetchedData.paymentMethod || method || 'unknown',
-          customerName: fetchedData.customerInfo?.name || fetchedData.customerName || 'N/A',
-          customerEmail: fetchedData.customerInfo?.email || fetchedData.customerEmail || 'N/A',
-          items: fetchedData.items || fetchedData.cart_items || [],
-          bankDetails: fetchedData.bankDetails || fetchedData.bank_details,
+          amount: fetchedData.finalTotal || fetchedData.amount || 0,
+          status: fetchedData.status || "unknown",
+          paymentMethod: fetchedData.paymentMethod || method || "unknown",
+          customerName: fetchedData.customerName || "N/A",
+          customerEmail: fetchedData.customerEmail || "N/A",
+          items: fetchedData.items || [],
+          bankDetails: fetchedData.bankDetails,
           paymentVerified: fetchedData.paymentVerified || false,
-          transactionReference: fetchedData.transactionReference || fetchedData.reference,
+          transactionReference: fetchedData.transactionReference,
           verificationStatus: fetchedData.verificationStatus,
           transactionId: fetchedData.transactionId,
           // Use stored calculated totals if available
-          totalAmountItemsOnly: fetchedData.totalAmountItemsOnly || fetchedData.total_amount_items_only,
-          shippingCost: fetchedData.shippingCost || fetchedData.shipping_cost,
-          taxAmount: fetchedData.taxAmount || fetchedData.tax_amount,
-          finalTotal: fetchedData.finalTotal || fetchedData.total_amount,
+          totalAmountItemsOnly: fetchedData.totalAmountItemsOnly,
+          shippingCost: fetchedData.shippingCost,
+          taxAmount: fetchedData.taxAmount,
+          finalTotal: fetchedData.finalTotal,
         };
 
-        // Ensure all totals are properly calculated
+        // ✅ UPDATED: Ensure all totals are properly calculated WITH ROUNDING
         const populatedOrder = ensureCalculatedTotals(orderData);
         setOrder(populatedOrder);
 
-        if (populatedOrder.paymentMethod === 'bank_transfer' &&
-            !populatedOrder.paymentVerified &&
-            !populatedOrder.transactionReference) {
+        // Auto-show reference modal for bank transfers if needed
+        if (
+          populatedOrder.paymentMethod === "bank_transfer" &&
+          !populatedOrder.paymentVerified &&
+          !populatedOrder.transactionReference
+        ) {
           setTimeout(() => setShowReferenceModal(true), 1000);
         }
       } else {
-        setError('Order not found.');
+        console.error(`❌ Order ${id} not found in ${collectionName}`);
+        setError("Order not found.");
       }
     } catch (err) {
-      console.error('Error fetching order from Firestore:', err);
-      setError('Failed to load order details from database.');
+      console.error("Error fetching order from Firestore:", err);
+      setError("Failed to load order details from database.");
     } finally {
       setLoading(false);
     }
@@ -291,34 +346,55 @@ function OrderSuccessContent() {
         ...order,
         paymentVerified: result.verified,
         transactionReference: result.data?.transactionReference,
-        verificationStatus: result.verified ? 'auto_verified' : 'pending_verification',
-        status: result.verified ? 'confirmed' : 'pending_verification'
+        verificationStatus: result.verified
+          ? "auto_verified"
+          : "pending_verification",
+        status: result.verified ? "confirmed" : "pending_verification",
       });
     }
 
     // Refresh order data from Firestore after a delay
     if (order?.orderId && order?.paymentMethod) {
-      setTimeout(() => fetchOrderFromFirestore(order.orderId, order.paymentMethod), 2000);
+      setTimeout(
+        () => fetchOrderFromFirestore(order.orderId, order.paymentMethod),
+        2000
+      );
     }
   };
 
-  const formatPrice = (amount: number) => `₦${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  // ✅ UPDATED: Format price with rounding
+  const formatPrice = (amount: number) => {
+    const roundedAmount = roundUpToNearest10(amount);
+    return `₦${roundedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
 
   const getPaymentStatusDisplay = () => {
     if (!order) return null;
 
-    const { paymentMethod, paymentVerified, status, transactionReference, verificationStatus } = order;
+    const {
+      paymentMethod,
+      paymentVerified,
+      status,
+      transactionReference,
+      verificationStatus,
+    } = order;
 
-    if (paymentMethod === 'bank_transfer') {
+    if (paymentMethod === "bank_transfer") {
       if (paymentVerified) {
         return (
           <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
             <div className="flex items-center">
-              <Icon icon="mdi:check-circle" className="w-8 h-8 text-green-500 mr-4" />
+              <Icon
+                icon="mdi:check-circle"
+                className="w-8 h-8 text-green-500 mr-4"
+              />
               <div>
-                <h3 className="text-lg font-semibold text-green-800">✅ Payment Verified!</h3>
+                <h3 className="text-lg font-semibold text-green-800">
+                  ✅ Payment Verified!
+                </h3>
                 <p className="text-green-700 text-sm mt-1">
-                  Your bank transfer has been verified and your order is being processed.
+                  Your bank transfer has been verified and your order is being
+                  processed.
                 </p>
                 {transactionReference && (
                   <p className="text-green-600 text-xs mt-1 font-mono">
@@ -335,10 +411,12 @@ function OrderSuccessContent() {
             <div className="flex items-center">
               <Icon icon="mdi:clock" className="w-8 h-8 text-yellow-500 mr-4" />
               <div>
-                <h3 className="text-lg font-semibold text-yellow-800">⏳ Payment Being Verified</h3>
+                <h3 className="text-lg font-semibold text-yellow-800">
+                  ⏳ Payment Being Verified
+                </h3>
                 <p className="text-yellow-700 text-sm mt-1">
-                  We received your transaction reference and are verifying your payment.
-                  You'll receive an email confirmation once verified.
+                  We received your transaction reference and are verifying your
+                  payment. You'll receive an email confirmation once verified.
                 </p>
                 <p className="text-yellow-600 text-xs mt-1 font-mono">
                   Reference: {transactionReference}
@@ -357,9 +435,12 @@ function OrderSuccessContent() {
               <div className="flex items-center">
                 <Icon icon="mdi:bank" className="w-8 h-8 text-blue-500 mr-4" />
                 <div>
-                  <h3 className="text-lg font-semibold text-blue-800">🏦 Complete Your Payment</h3>
+                  <h3 className="text-lg font-semibold text-blue-800">
+                    🏦 Complete Your Payment
+                  </h3>
                   <p className="text-blue-700 text-sm mt-1">
-                    Please complete your bank transfer and submit your transaction reference.
+                    Please complete your bank transfer and submit your
+                    transaction reference.
                   </p>
                 </div>
               </div>
@@ -374,13 +455,18 @@ function OrderSuccessContent() {
           </div>
         );
       }
-    } else if (paymentMethod === 'flutterwave') {
+    } else if (paymentMethod === "flutterwave") {
       return (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
           <div className="flex items-center">
-            <Icon icon="mdi:check-circle" className="w-8 h-8 text-green-500 mr-4" />
+            <Icon
+              icon="mdi:check-circle"
+              className="w-8 h-8 text-green-500 mr-4"
+            />
             <div>
-              <h3 className="text-lg font-semibold text-green-800">✅ Payment Successful!</h3>
+              <h3 className="text-lg font-semibold text-green-800">
+                ✅ Payment Successful!
+              </h3>
               <p className="text-green-700 text-sm mt-1">
                 Your payment via Flutterwave has been processed successfully.
               </p>
@@ -389,7 +475,7 @@ function OrderSuccessContent() {
                   Reference: {order.transactionReference}
                 </p>
               )}
-               {order.transactionId && (
+              {order.transactionId && (
                 <p className="text-green-600 text-xs mt-1 font-mono">
                   Transaction ID: {order.transactionId}
                 </p>
@@ -400,13 +486,18 @@ function OrderSuccessContent() {
       );
     }
 
-    if (order.status === 'confirmed') {
+    if (order.status === "confirmed") {
       return (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
           <div className="flex items-center">
-            <Icon icon="mdi:check-circle" className="w-8 h-8 text-green-500 mr-4" />
+            <Icon
+              icon="mdi:check-circle"
+              className="w-8 h-8 text-green-500 mr-4"
+            />
             <div>
-              <h3 className="text-lg font-semibold text-green-800">✅ Order Confirmed</h3>
+              <h3 className="text-lg font-semibold text-green-800">
+                ✅ Order Confirmed
+              </h3>
               <p className="text-green-700 text-sm mt-1">
                 Your order is confirmed and will be processed shortly.
               </p>
@@ -414,20 +505,22 @@ function OrderSuccessContent() {
           </div>
         </div>
       );
-    } else if (order.status === 'pending_payment') {
-        return (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
-                <div className="flex items-center">
-                    <Icon icon="mdi:clock" className="w-8 h-8 text-yellow-500 mr-4" />
-                    <div>
-                        <h3 className="text-lg font-semibold text-yellow-800">⏳ Order Pending Payment</h3>
-                        <p className="text-yellow-700 text-sm mt-1">
-                            Your order is awaiting payment confirmation.
-                        </p>
-                    </div>
-                </div>
+    } else if (order.status === "pending_payment") {
+      return (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+          <div className="flex items-center">
+            <Icon icon="mdi:clock" className="w-8 h-8 text-yellow-500 mr-4" />
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-800">
+                ⏳ Order Pending Payment
+              </h3>
+              <p className="text-yellow-700 text-sm mt-1">
+                Your order is awaiting payment confirmation.
+              </p>
             </div>
-        );
+          </div>
+        </div>
+      );
     }
 
     return null;
@@ -454,10 +547,20 @@ function OrderSuccessContent() {
         <Header />
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center p-6 bg-white rounded-lg shadow-md border border-gray-200">
-            <Icon icon="mdi:alert-circle" className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Order</h1>
-            <p className="text-gray-600 mb-6">{error || "No order details available."}</p>
-            <Link href="/" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+            <Icon
+              icon="mdi:alert-circle"
+              className="w-16 h-16 text-red-500 mx-auto mb-4"
+            />
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Error Loading Order
+            </h1>
+            <p className="text-gray-600 mb-6">
+              {error || "No order details available."}
+            </p>
+            <Link
+              href="/"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
               Go to Homepage
             </Link>
           </div>
@@ -478,13 +581,14 @@ function OrderSuccessContent() {
               <Icon icon="mdi:check" className="w-10 h-10 text-green-600" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {order.paymentVerified ? 'Order Confirmed!' : 'Order Placed Successfully!'}
+              {order.paymentVerified
+                ? "Order Confirmed!"
+                : "Order Placed Successfully!"}
             </h1>
             <p className="text-gray-600 max-w-2xl mx-auto">
               {order.paymentVerified
-                ? 'Thank you for your order! Your payment has been confirmed and we\'re preparing your items for shipment.'
-                : 'Thank you for your order! Please complete your payment to confirm your order.'
-              }
+                ? "Thank you for your order! Your payment has been confirmed and we're preparing your items for shipment."
+                : "Thank you for your order! Please complete your payment to confirm your order."}
             </p>
           </div>
 
@@ -506,33 +610,50 @@ function OrderSuccessContent() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Amount:</span>
-                  <span className="font-bold text-lg text-red-600">{formatPrice(order.finalTotal)}</span>
+                  <span className="font-bold text-lg text-red-600">
+                    {formatPrice(order.finalTotal)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Payment Method:</span>
-                  <span className="font-medium capitalize">{order.paymentMethod.replace(/_/g, ' ')}</span>
+                  <span className="font-medium capitalize">
+                    {order.paymentMethod.replace(/_/g, " ")}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status:</span>
-                  <span className={`font-medium capitalize ${
-                    order.paymentVerified ? 'text-green-600' : 'text-yellow-600'
-                  }`}>
-                    {order.paymentVerified ? 'Confirmed' : 'Pending Payment'}
+                  <span
+                    className={`font-medium capitalize ${
+                      order.paymentVerified
+                        ? "text-green-600"
+                        : "text-yellow-600"
+                    }`}
+                  >
+                    {order.paymentVerified ? "Confirmed" : "Pending Payment"}
                   </span>
                 </div>
               </div>
 
               {/* Detailed Breakdown */}
               <div className="border-t pt-4 text-sm text-gray-700">
-                <h3 className="font-medium text-gray-900 mb-3">Order Breakdown:</h3>
-                
+                <h3 className="font-medium text-gray-900 mb-3">
+                  Order Breakdown:
+                </h3>
+
                 {/* Items */}
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2 mb-4">
                   {order.items.map((item, index) => (
-                    <div key={item.id || index} className="flex justify-between text-sm">
+                    <div
+                      key={item.id || index}
+                      className="flex justify-between text-sm"
+                    >
                       <div className="flex-1">
-                        <span className="text-gray-900 font-medium">{item.itemName}</span>
-                        <span className="text-gray-500 ml-2">× {item.quantity}</span>
+                        <span className="text-gray-900 font-medium">
+                          {item.itemName}
+                        </span>
+                        <span className="text-gray-500 ml-2">
+                          × {item.quantity}
+                        </span>
                       </div>
                       <span className="font-medium text-gray-900">
                         {formatPrice(item.amount * item.quantity)}
@@ -554,8 +675,12 @@ function OrderSuccessContent() {
                         <span className="text-xs text-green-600">(Free!)</span>
                       )}
                     </span>
-                    <span className={order.isFreeShipping ? 'text-green-600' : ''}>
-                      {order.isFreeShipping ? 'FREE' : formatPrice(order.shippingCost)}
+                    <span
+                      className={order.isFreeShipping ? "text-green-600" : ""}
+                    >
+                      {order.isFreeShipping
+                        ? "FREE"
+                        : formatPrice(order.shippingCost)}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -564,21 +689,24 @@ function OrderSuccessContent() {
                   </div>
                   <div className="flex justify-between font-bold text-base border-t pt-2">
                     <span>Total:</span>
-                    <span className="text-red-600">{formatPrice(order.finalTotal)}</span>
+                    <span className="text-red-600">
+                      {formatPrice(order.finalTotal)}
+                    </span>
                   </div>
                 </div>
 
                 {/* Free Shipping Message */}
                 {order.isFreeShipping && (
                   <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                    🎉 You qualified for free shipping by spending over {formatPrice(FREE_SHIPPING_THRESHOLD)}!
+                    🎉 You qualified for free shipping by spending over{" "}
+                    {formatPrice(FREE_SHIPPING_THRESHOLD)}!
                   </div>
                 )}
               </div>
             </div>
 
             {/* Bank Transfer Details */}
-            {order.paymentMethod === 'bank_transfer' && order.bankDetails && (
+            {order.paymentMethod === "bank_transfer" && order.bankDetails && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
                   <Icon icon="mdi:bank" className="w-6 h-6 mr-2" />
@@ -588,14 +716,22 @@ function OrderSuccessContent() {
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Bank Name:</span>
-                    <span className="font-medium">{order.bankDetails.bankName}</span>
+                    <span className="font-medium">
+                      {order.bankDetails.bankName}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Account Number:</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium font-mono">{order.bankDetails.accountNumber}</span>
+                      <span className="font-medium font-mono">
+                        {order.bankDetails.accountNumber}
+                      </span>
                       <button
-                        onClick={() => navigator.clipboard.writeText(order.bankDetails!.accountNumber)}
+                        onClick={() =>
+                          navigator.clipboard.writeText(
+                            order.bankDetails!.accountNumber
+                          )
+                        }
                         className="text-blue-600 hover:text-blue-800"
                       >
                         <Icon icon="mdi:content-copy" className="w-4 h-4" />
@@ -604,14 +740,22 @@ function OrderSuccessContent() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Account Name:</span>
-                    <span className="font-medium">{order.bankDetails.accountName}</span>
+                    <span className="font-medium">
+                      {order.bankDetails.accountName}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center border-t pt-3">
                     <span className="text-gray-600">Amount to Transfer:</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-xl text-red-600">{formatPrice(order.finalTotal)}</span>
+                      <span className="font-bold text-xl text-red-600">
+                        {formatPrice(order.finalTotal)}
+                      </span>
                       <button
-                        onClick={() => navigator.clipboard.writeText(order.finalTotal.toString())}
+                        onClick={() =>
+                          navigator.clipboard.writeText(
+                            order.finalTotal.toString()
+                          )
+                        }
                         className="text-blue-600 hover:text-blue-800"
                       >
                         <Icon icon="mdi:content-copy" className="w-4 h-4" />
@@ -642,53 +786,65 @@ function OrderSuccessContent() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center p-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                  order.paymentVerified ? 'bg-green-100' : 'bg-blue-100'
-                }`}>
-                  <Icon icon="mdi:email" className={`w-6 h-6 ${
-                    order.paymentVerified ? 'text-green-600' : 'text-blue-600'
-                  }`} />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                    order.paymentVerified ? "bg-green-100" : "bg-blue-100"
+                  }`}
+                >
+                  <Icon
+                    icon="mdi:email"
+                    className={`w-6 h-6 ${
+                      order.paymentVerified ? "text-green-600" : "text-blue-600"
+                    }`}
+                  />
                 </div>
                 <h3 className="font-medium mb-2">Email Confirmation</h3>
                 <p className="text-sm text-gray-600">
                   {order.paymentVerified
                     ? "You'll receive order confirmation and tracking details via email."
-                    : "You'll receive confirmation once payment is verified."
-                  }
+                    : "You'll receive confirmation once payment is verified."}
                 </p>
               </div>
 
               <div className="text-center p-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                  order.paymentVerified ? 'bg-green-100' : 'bg-gray-100'
-                }`}>
-                  <Icon icon="mdi:package" className={`w-6 h-6 ${
-                    order.paymentVerified ? 'text-green-600' : 'text-gray-400'
-                  }`} />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                    order.paymentVerified ? "bg-green-100" : "bg-gray-100"
+                  }`}
+                >
+                  <Icon
+                    icon="mdi:package"
+                    className={`w-6 h-6 ${
+                      order.paymentVerified ? "text-green-600" : "text-gray-400"
+                    }`}
+                  />
                 </div>
                 <h3 className="font-medium mb-2">Order Processing</h3>
                 <p className="text-sm text-gray-600">
                   {order.paymentVerified
                     ? "We're preparing your order for shipment."
-                    : "Processing begins after payment verification."
-                  }
+                    : "Processing begins after payment verification."}
                 </p>
               </div>
 
               <div className="text-center p-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                  order.paymentVerified ? 'bg-green-100' : 'bg-gray-100'
-                }`}>
-                  <Icon icon="mdi:truck" className={`w-6 h-6 ${
-                    order.paymentVerified ? 'text-green-600' : 'text-gray-400'
-                  }`} />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                    order.paymentVerified ? "bg-green-100" : "bg-gray-100"
+                  }`}
+                >
+                  <Icon
+                    icon="mdi:truck"
+                    className={`w-6 h-6 ${
+                      order.paymentVerified ? "text-green-600" : "text-gray-400"
+                    }`}
+                  />
                 </div>
                 <h3 className="font-medium mb-2">Shipping</h3>
                 <p className="text-sm text-gray-600">
                   {order.paymentVerified
                     ? "Track your order with the provided tracking number."
-                    : "Shipping details will be sent after payment confirmation."
-                  }
+                    : "Shipping details will be sent after payment confirmation."}
                 </p>
               </div>
             </div>
@@ -703,15 +859,16 @@ function OrderSuccessContent() {
               Continue Shopping
             </Link>
 
-            {order.paymentMethod === 'bank_transfer' && !order.transactionReference && (
-              <button
-                onClick={() => setShowReferenceModal(true)}
-                className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <Icon icon="mdi:upload" className="w-5 h-5" />
-                Submit Payment Reference
-              </button>
-            )}
+            {order.paymentMethod === "bank_transfer" &&
+              !order.transactionReference && (
+                <button
+                  onClick={() => setShowReferenceModal(true)}
+                  className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Icon icon="mdi:upload" className="w-5 h-5" />
+                  Submit Payment Reference
+                </button>
+              )}
 
             <button
               onClick={() => window.print()}
@@ -725,11 +882,17 @@ function OrderSuccessContent() {
           <div className="text-center text-sm text-gray-600">
             <p className="mb-2">Questions about your order?</p>
             <p>
-              <a href="mailto:symbolstores45@gmail.com" className="text-blue-600 hover:underline">
+              <a
+                href="mailto:symbolstores45@gmail.com"
+                className="text-blue-600 hover:underline"
+              >
                 symbolstores45@gmail.com
-              </a>
-              {' '} | {' '}
-              <a href="tel:+2348012345678" className="text-blue-600 hover:underline">
+              </a>{" "}
+              |{" "}
+              <a
+                href="tel:+2348012345678"
+                className="text-blue-600 hover:underline"
+              >
                 +234 801 234 5678
               </a>
             </p>
@@ -744,10 +907,10 @@ function OrderSuccessContent() {
           onClose={() => setShowReferenceModal(false)}
           orderData={{
             orderId: order.orderId,
-            amount: order.finalTotal, // Always use finalTotal (guaranteed to be defined)
+            amount: order.finalTotal, // Always use finalTotal (guaranteed to be defined and rounded)
             customerName: order.customerName,
             customerEmail: order.customerEmail,
-            bankDetails: order.bankDetails
+            bankDetails: order.bankDetails,
           }}
           onSuccess={handleReferenceSubmitted}
         />

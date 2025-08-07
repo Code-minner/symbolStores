@@ -7,20 +7,10 @@ import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCart, CartItem } from "@/lib/CartContext"; // ✅ Import CartItem
+import { useCart, CartItem } from "@/lib/CartContext";
 import { useReviewData } from "@/lib/hooks/useReviewData";
 import { useFlutterwavePayment } from "@/lib/hooks/useFlutterwave";
 import { useBankTransfer } from "@/lib/hooks/useBankTransfer";
-
-// No need for BackendOrderItem if CartItem is consistent across frontend and backend.
-// interface BackendOrderItem {
-//   productId: string;
-//   name: string;
-//   quantity: number;
-//   price: number;
-//   imageUrl?: string;
-//   sku?: string;
-// }
 
 // Flutterwave Payment Component (no change here, as it uses PaymentData which is correct)
 function FlutterwavePayment({
@@ -300,8 +290,8 @@ function BankTransferPayment({
 
       // Define static bank details for the frontend for now.
       const staticBankDetails = {
-        accountName: "SYMBOL STORES",
-        accountNumber: "0123456789",
+        accountName: "SYMBOL STORES LIMITED",
+        accountNumber: "0036612207",
         bankName: "ACCESS BANK",
       };
 
@@ -848,43 +838,11 @@ export default function ReviewPage() {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <p className="text-sm text-gray-600">
                   By proceeding with payment, you agree to our{" "}
-                  <Link
-                    href="/terms"
-                    className="text-red-500 hover:text-red-600 underline"
-                  >
-                    terms and conditions
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/return-policy"
-                    className="text-red-500 hover:text-red-600 underline"
-                  >
-                    return policy
+                  <Link href="/terms-and-conditions" className="text-blue-600 hover:text-blue-700 underline">
+                    Terms and Conditions
                   </Link>
+                  .
                 </p>
-              </div>
-
-              {/* Back Button */}
-              <div className="flex justify-start pt-6">
-                <button
-                  onClick={handleBackToPayment}
-                  className="flex items-center gap-2 text-red-500 hover:text-red-600 font-medium transition-colors group"
-                >
-                  <svg
-                    className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  BACK TO CHECKOUT
-                </button>
               </div>
             </div>
           </div>
