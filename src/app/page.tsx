@@ -106,7 +106,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="w-full">
       <Header />
       {/* ✅ FIXED: Proper centering without mr-16 */}
       <div className="max-w-[1400px] mx-auto px-4 py-8">

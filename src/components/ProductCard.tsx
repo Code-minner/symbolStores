@@ -161,7 +161,7 @@ export default function ProductCard({
     >
       {/* Image Container - Fixed Height */}
       <div
-        className="h-[170px] sm:h-[220px]  "
+        className="h-[160px] sm:h-[210px]  "
         style={{
           position: "relative",
           marginBottom: "10px",
@@ -253,7 +253,7 @@ export default function ProductCard({
         <div>
           {/* Category */}
           <span
-            className="text-[0.6rem] sm:text-[0.9rem]"
+            className="text-[0.5rem] sm:text-[0.9rem]"
             style={{
               color: "#EE5858",
               backgroundColor: "#D8262670",
@@ -272,7 +272,7 @@ export default function ProductCard({
               style={{
                 fontSize: "1rem",
                 fontWeight: "400",
-                margin: "8px 0",
+                margin: "8px 0 4px",
                 cursor: "pointer",
                 textDecoration: "none",
                 color: "inherit",
@@ -298,7 +298,7 @@ export default function ProductCard({
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              margin: "5px 0",
+              margin: "2px 0",
             }}
           >
             <div>
@@ -397,13 +397,13 @@ export default function ProductCard({
                   -
                 </button>
                 <span
-                  className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
+                  className="text-[8px] sm:text-[14px] py-[0px] px-[1px] min-w-[25px] max-w-[30px]  sm:py-[2.5px] sm:px-[5px]"
                   style={{
                     border: "2px solid #FF0000",
                     margin: "0 2px",
                     textAlign: "center",
                     borderRadius: "4px",
-                    minWidth: "30px",
+              
                   }}
                 >
                   {quantity}
@@ -428,7 +428,7 @@ export default function ProductCard({
               <button
                 onClick={handleAddToCart}
                 disabled={!isInStock}
-                className="text-[8px] sm:text-[12px] md:text-[13px] lg:text-[14px] py-2 sm:py-4  px-2"
+                className="text-[8px] sm:text-[12px] md:text-[13px] lg:text-[14px] py-2 sm:py-2 px-1 sm:px-3"
                 style={{
                   flex: 1,
                   border: `1px solid ${isInStock ? "#FF0000" : "#9CA3AF"}`,

@@ -15,7 +15,7 @@ const roundUpToNearest10 = (price: number): number => {
 };
 
 // Company branding - Add your logo URL here
-const COMPANY_LOGO_URL = "https://symbolstores.com/assets/logo-white.png"; // Replace with your actual logo URL
+const COMPANY_LOGO_URL = "https://blogger.googleusercontent.com/img/a/AVvXsEgK1twSSTpBfb733eXn3ufZ_gpU17vzZ0v25saCwUZRlrXQT3ceONzwo06auDlfUJt_7cEXDPIS-4IJLufMCFsEjDT_OcH5jHCXjUGA5b3iEAmQRL11hF_kPekeJOGvW0PYBnozZoTRdQtB5VHyvz4zbsXU3s1KK2MjnUuE3n-B2TtIiSSPwDSwJ4vL0HM"; // Replace with your actual logo URL
 const COMPANY_NAME = "Symbol Stores";
 const FALLBACK_LOGO = "SS"; // Fallback text if logo fails to load
 

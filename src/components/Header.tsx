@@ -211,7 +211,7 @@ const categorySubItems: { [key: string]: string[] } = {
   
   "stabilizer": [],
   
-  "Fornitures": [],
+  "Furniture": [],
   
 };
 
@@ -406,7 +406,7 @@ const categorySubItems: { [key: string]: string[] } = {
   );
 
   return (
-    <header className="bg-white sticky top-0 w-full z-[100]">
+    <header className="bg-white sticky top-0 w-full z-[100] shadow-md">
       {/* Notification Pop-up */}
       {notification && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl z-[1002] transition-all duration-300 ease-out animate-slideInDown">
