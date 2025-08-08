@@ -1462,7 +1462,7 @@ function ShopContent() {
               ) : (
                 <>
                   {/* Products Grid - IMPROVED SPACING FOR SMALL SCREENS */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 mb-8">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 mb-8">
                     {currentProducts.map((product, index) => (
                       <div key={product.id} className="flex justify-center">
                         <ProductCard product={product} isTopRated={index < 3} />
