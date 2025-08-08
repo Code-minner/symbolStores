@@ -94,57 +94,57 @@ export default function Header() {
 
 const categorySubItems: { [key: string]: string[] } = {
   "All Categories": [],
-  
+
   "Generator": [
-    "Sound proof generator set",
-    "Manual starter",
-    "Electric and manual starter"
+    "Sound Proof Generator Set",
+    "Manual Starter",
+    "Electric And Manual Starter"
   ],
-  
+
   "Audio Bass": [
     "Mini Hi-Fi System",
     "Wireless Speakers",
     "Sound Bars",
-    "DVD Player",
-    "AV Receiver Systems",
+    "Dvd Player",
+    "Av Receiver Systems",
     "Home Theatre Systems",
     "Rechargeable Speaker System"
   ],
-  
+
   "Stove": [
     "Table Top Gas Cooker",
     "50x50 Cookers",
-    "60x60 cookers",
+    "60x60 Cookers",
     "60x90 Cookers",
     "90x60 Cookers",
     "Air Fryer"
   ],
-  
+
   "Washing Machine": [
     "Front Load Washing Machine",
     "Top Load Washing Machine",
     "Automatic Washing Machine",
-    "Wash and Dry",
+    "Wash And Dry",
     "Commercial Dryer",
     "Twin Tub Washing Machines",
     "Tumble Dryer"
   ],
-  
-  "Air conditioner": [
+
+  "Air Conditioner": [
     "Portable Air Conditioner",
     "Inverter Air Conditioner",
     "Floor Standing Air Conditioner",
     "Split Air Conditioner"
   ],
-  
+
   "Freezers": [
     "Standing Freezer",
     "Chest Freezer",
     "Deep Freezer"
   ],
-  
+
   "Refrigerators": [
-    "InstaView Door In Door Refrigerator",
+    "Instaview Door In Door Refrigerator",
     "Door In Door Refrigerator",
     "Side By Side Refrigerator",
     "Bottom Freezer Refrigerator",
@@ -152,28 +152,28 @@ const categorySubItems: { [key: string]: string[] } = {
     "Single Door Refrigerator",
     "Double Door Refrigerator"
   ],
-  
+
   "TVs": [
-    "Signature TV",
-    "Laser TV",
-    "QNED TV",
-    "OLED TV",
-    "NanoCell TV",
-    "QLED TV",
-    "ULED TV",
-    "UHD TV",
-    "Smart TV",
-    "LED TV",
-    "FHD"
+    "Signature Tv",
+    "Laser Tv",
+    "Qned Tv",
+    "Oled Tv",
+    "Nanocell Tv",
+    "Qled Tv",
+    "Uled Tv",
+    "Uhd Tv",
+    "Smart Tv",
+    "Led Tv",
+    "Fhd"
   ],
 
-    "Fan's": [
+  "Fan's": [
     "Rechargeable Fan",
     "Ceiling Fan",
     "Standing Fan",
     "Wall Fan"
   ],
-  
+
   "Home & Kitchen": [
     "Toaster",
     "Air Fryer",
@@ -184,36 +184,29 @@ const categorySubItems: { [key: string]: string[] } = {
     "Vacuum Cleaner",
     "Slow Juicer",
     "Jug Kettle",
-    "COFFEE MAKER",
-    "SandwichMaker",
-    "MIXER GRINDER"
+    "Coffee Maker",
+    "Sandwichmaker",
+    "Mixer Grinder"
   ],
-  
+
   "Pressing Iron": [
     "Dry Iron",
     "Steam Iron"
   ],
-  
+
   "Extensions": [
-    "Ac guard"
+    "Ac Guard"
   ],
 
-    
   "Microwave": [],
-  
-  "WATER DISPENSER": [],
-  
-  "BLENDER": [],
-  
-  "YAM PONDER": [],
-  
-  "DISH WASHER": [],
-  
-  "stabilizer": [],
-  
+  "Water Dispenser": [],
+  "Blender": [],
+  "Yam Pounder": [],
+  "Dish Washer": [],
+  "Stabilizer": [],
   "Furniture": [],
-  
 };
+
 
   const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
