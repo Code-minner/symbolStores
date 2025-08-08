@@ -1,4 +1,4 @@
-// src/lib/hooks/useFlutterwave.ts - Updated with Order Creation
+// src/lib/hooks/useFlutterwave.ts - Updated with Cart Clearing
 "use client";
 
 import { useState } from 'react';
@@ -95,7 +95,8 @@ declare global {
     }
 }
 
-export function useFlutterwavePayment() {
+// ✅ UPDATED: Added clearCart parameter to the hook
+export function useFlutterwavePayment(clearCart?: () => void) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -219,6 +220,13 @@ export function useFlutterwavePayment() {
 
                                 if (verificationResult.success) {
                                     console.log("🎉 Payment verification successful!");
+                                    
+                                    // ✅ CLEAR CART ONLY AFTER SUCCESSFUL VERIFICATION
+                                    if (clearCart && typeof clearCart === 'function') {
+                                        console.log("🛒 Clearing cart after successful payment...");
+                                        clearCart();
+                                    }
+
                                     resolve({
                                         success: true,
                                         data: {
@@ -232,8 +240,10 @@ export function useFlutterwavePayment() {
                                         },
                                     });
                                 } else {
+                                    // ❌ DON'T CLEAR CART ON VERIFICATION FAILURE
                                     const errorMsg = verificationResult.warning || verificationResult.error || 'Payment verification failed';
                                     console.error("❌ Payment verification failed:", errorMsg);
+                                    console.log("🛒 Cart NOT cleared - customer can retry payment");
                                     setError(errorMsg);
                                     reject({
                                         success: false,
@@ -241,7 +251,9 @@ export function useFlutterwavePayment() {
                                     });
                                 }
                             } catch (error) {
+                                // ❌ DON'T CLEAR CART ON ERROR
                                 console.error("❌ Payment verification error:", error);
+                                console.log("🛒 Cart NOT cleared - customer can retry payment");
                                 setIsProcessing(false);
                                 setError('Payment verification error');
                                 reject({
@@ -250,7 +262,9 @@ export function useFlutterwavePayment() {
                                 });
                             }
                         } else {
+                            // ❌ DON'T CLEAR CART ON PAYMENT FAILURE
                             console.error("❌ Payment was not successful:", response.status);
+                            console.log("🛒 Cart NOT cleared - customer can retry payment");
                             setIsProcessing(false);
                             setError('Payment was not successful');
                             reject({
@@ -260,8 +274,10 @@ export function useFlutterwavePayment() {
                         }
                     },
                     onclose: () => {
+                        // ❌ DON'T CLEAR CART WHEN USER CLOSES MODAL
                         setIsProcessing(false);
                         console.log('⚠️ Payment modal closed by user');
+                        console.log("🛒 Cart NOT cleared - user might want to retry");
                         reject({
                             success: false,
                             error: 'Payment cancelled by user'

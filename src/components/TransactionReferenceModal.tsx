@@ -1,4 +1,4 @@
-// src/components/TransactionReferenceModal.tsx - USING ICONIFY ICONS
+// src/components/TransactionReferenceModal.tsx - UPDATED WITH CART CLEARING
 "use client";
 
 import React, { useState } from "react";
@@ -19,6 +19,7 @@ interface TransactionReferenceModalProps {
     };
   };
   onSuccess: (result: any) => void;
+  clearCart?: () => void; // ✅ NEW: Add clearCart parameter like Flutterwave
 }
 
 export default function TransactionReferenceModal({
@@ -26,6 +27,7 @@ export default function TransactionReferenceModal({
   onClose,
   orderData,
   onSuccess,
+  clearCart, // ✅ NEW: Accept clearCart function
 }: TransactionReferenceModalProps) {
   const [transactionReference, setTransactionReference] = useState("");
   const [transferAmount, setTransferAmount] = useState(
@@ -64,6 +66,11 @@ export default function TransactionReferenceModal({
     setError(null);
 
     try {
+      console.log("🏦 Verifying bank transfer reference...");
+      console.log(`🆔 Order ID: ${orderData.orderId}`);
+      console.log(`📝 Reference: ${transactionReference.trim()}`);
+      console.log(`💰 Amount: ₦${Number(transferAmount).toLocaleString()}`);
+
       const response = await fetch(
         "/api/payments/bank-transfer/verify-reference",
         {
@@ -84,14 +91,45 @@ export default function TransactionReferenceModal({
       const result = await response.json();
 
       if (result.success) {
+        console.log("✅ Bank transfer verification response:", result);
         setVerificationResult(result);
         setStep("success");
         onSuccess(result);
+
+        // ✅ CLEAR CART AFTER REFERENCE SUBMISSION - Multiple methods for reliability
+        if (clearCart && typeof clearCart === 'function') {
+          console.log("🛒 Clearing cart - customer submitted payment reference");
+          clearCart();
+        }
+        
+        // ✅ BACKUP: Clear localStorage directly
+        try {
+          localStorage.removeItem('shopping-cart');
+          console.log("🛒 Backup: localStorage cleared directly");
+        } catch (error) {
+          console.error("❌ Failed to clear localStorage:", error);
+        }
+        
+        // ✅ BACKUP: Dispatch storage event for cross-tab sync
+        try {
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'shopping-cart',
+            newValue: null,
+            oldValue: localStorage.getItem('shopping-cart')
+          }));
+        } catch (error) {
+          console.error("❌ Failed to dispatch storage event:", error);
+        }
       } else {
+        // ❌ DON'T CLEAR CART ON VERIFICATION FAILURE (Reference not accepted)
+        console.error("❌ Bank transfer verification failed:", result.error);
+        console.log("🛒 Cart NOT cleared - reference was rejected, customer can retry");
         setError(result.error || "Failed to verify transaction reference");
       }
     } catch (error) {
-      console.error("Transaction verification error:", error);
+      // ❌ DON'T CLEAR CART ON NETWORK/API ERRORS
+      console.error("❌ Bank transfer verification error:", error);
+      console.log("🛒 Cart NOT cleared - network error, customer can retry");
       setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
@@ -99,6 +137,13 @@ export default function TransactionReferenceModal({
   };
 
   const formatPrice = (amount: number) => `₦${amount.toLocaleString()}`;
+
+  const handleClose = () => {
+    // ❌ DON'T CLEAR CART WHEN MODAL IS CLOSED (only clear after successful reference submission)
+    console.log("⚠️ Bank transfer modal closed by user");
+    console.log("🛒 Cart NOT cleared - user didn't submit reference yet");
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -111,7 +156,7 @@ export default function TransactionReferenceModal({
             {step === "success" && "✅ Payment Verification"}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose} // ✅ Use handleClose instead of onClose directly
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
             <Icon icon="mdi:close" width={24} height={24} />
@@ -389,7 +434,7 @@ export default function TransactionReferenceModal({
         {step === "success" && verificationResult && (
           <div className="p-6">
             {verificationResult.verified ? (
-              /* Auto-Verified Success */
+              /* Auto-Verified Success - ✅ CART ALREADY CLEARED */
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Icon
@@ -406,7 +451,7 @@ export default function TransactionReferenceModal({
 
                 <p className="text-gray-600 mb-6">
                   Your payment has been automatically verified and your order is
-                  now confirmed.
+                  now confirmed. Your cart has been cleared.
                 </p>
 
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
@@ -442,14 +487,14 @@ export default function TransactionReferenceModal({
                 </p>
 
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Continue Shopping
                 </button>
               </div>
             ) : (
-              /* Manual Verification Pending */
+              /* Manual Verification Pending - ❌ CART NOT CLEARED */
               <div className="text-center">
                 <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Icon
@@ -466,7 +511,7 @@ export default function TransactionReferenceModal({
 
                 <p className="text-gray-600 mb-6">
                   Your transaction reference has been received and is being
-                  verified by our team.
+                  verified by our team. Your cart has been cleared since you've completed your payment.
                 </p>
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
@@ -502,7 +547,7 @@ export default function TransactionReferenceModal({
 
                 <div className="flex gap-3 justify-center">
                   <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="bg-gray-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-700 transition-colors"
                   >
                     Close
