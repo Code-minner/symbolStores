@@ -220,7 +220,7 @@ export default function ProductCard({
               position: "absolute",
               top: "10px",
               left: "10px",
-              backgroundColor: !isInStock ? "#9CA3AF" : "#EE5858",
+              backgroundColor: !isInStock ? "#9CA3AF" : "",
               color: "rgb(255, 255, 255)",
               padding: "4px 8px",
               fontSize: "0.875rem",
@@ -233,7 +233,7 @@ export default function ProductCard({
               : hasOriginalPrice
                 ? "Sale"
                 : isTopRated
-                  ? "Top Rated"
+                  ? ""
                   : ""}
           </span>
         )}
