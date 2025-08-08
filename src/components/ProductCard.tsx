@@ -140,12 +140,11 @@ export default function ProductCard({
 
   return (
     <div
+    className="max-w-full min-w-full md:min-w-[200px]  "
       style={{
         boxSizing: "border-box",
         margin: 0,
         width: "100%",
-        minWidth: "100%",
-        maxWidth: "100%",
         height: "100%",
         backgroundColor: "#fff",
         padding: "10px",

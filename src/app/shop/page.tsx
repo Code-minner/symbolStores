@@ -1,8 +1,8 @@
-// src/app/shop/page.tsx - Using ProductsCache (No Quota Error!)
+// src/app/shop/page.tsx - Fixed Version with Working Filter Reduction
 "use client";
 
 import React from "react";
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { getAllProducts, Product } from "@/lib/ProductsCache"; // 🔥 Clean import!
 import Header from "@/components/Header";
@@ -18,14 +18,24 @@ interface Filters {
   discountOnly: boolean;
 }
 
+// Debounced callback hook
+const useDebouncedCallback = (callback: (...args: any[]) => void, delay: number) => {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  return useCallback((...args: any[]) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => callback(...args), delay);
+  }, [callback, delay]);
+};
+
 function ShopContent() {
   const searchParams = useSearchParams();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [availableSubcategories, setAvailableSubcategories] = useState<
-    string[]
-  >([]);
+  const [availableSubcategories, setAvailableSubcategories] = useState<string[]>([]);
   const [brandSearch, setBrandSearch] = useState("");
   const [showAllBrands, setShowAllBrands] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -147,12 +157,14 @@ function ShopContent() {
     fetchProducts();
   }, []);
 
-  // Auto-select brand from URL parameter
+  // ✅ FIXED: Better brand parameter handling
   useEffect(() => {
     if (brandParam && allBrands.includes(brandParam)) {
-      setFilters((prev) => ({
+      setFilters(prev => ({
         ...prev,
-        selectedBrands: [brandParam],
+        selectedBrands: prev.selectedBrands.includes(brandParam) 
+          ? prev.selectedBrands 
+          : [...prev.selectedBrands, brandParam],
       }));
     }
   }, [brandParam]);
@@ -161,6 +173,11 @@ function ShopContent() {
   useEffect(() => {
     setCurrentPage(1);
   }, [filters, categoryParam, subcategoryParam, searchParam, brandParam]);
+
+  // ✅ FIXED: Debounced brand search
+  const debouncedSetBrandSearch = useDebouncedCallback((searchTerm: string) => {
+    setBrandSearch(searchTerm);
+  }, 300);
 
   // Filtered brands based on search
   const filteredBrands = useMemo(() => {
@@ -172,14 +189,18 @@ function ShopContent() {
     );
   }, [allBrands, brandSearch]);
 
-  // Apply all filters including URL parameters - YOUR EXACT LOGIC
+  // ✅ FIXED: Improved filtered products with better error handling
   const filteredProducts = useMemo(() => {
     let filtered = [...allProducts];
+
+    // Early return if no products
+    if (!filtered.length) return [];
 
     // URL Parameter Filters (from header navigation)
     if (categoryParam) {
       filtered = filtered.filter((product) => {
-        const productCategory = product.category?.toLowerCase() || "";
+        if (!product.category) return false;
+        const productCategory = product.category.toLowerCase();
         const searchCategory = categoryParam.toLowerCase();
         return (
           productCategory === searchCategory ||
@@ -191,7 +212,8 @@ function ShopContent() {
 
     if (subcategoryParam) {
       filtered = filtered.filter((product) => {
-        const productSubcategory = product.subcategory?.toLowerCase() || "";
+        if (!product.subcategory) return false;
+        const productSubcategory = product.subcategory.toLowerCase();
         const searchSubcategory = subcategoryParam.toLowerCase();
         return (
           productSubcategory === searchSubcategory ||
@@ -204,31 +226,34 @@ function ShopContent() {
     // Search filter from URL
     if (searchParam) {
       const searchTerm = searchParam.toLowerCase().trim();
-      filtered = filtered.filter((product) => {
-        const searchableFields = [
-          product.itemName,
-          product.brand,
-          product.category,
-          product.subcategory,
-          product.description || "", // Handle empty descriptions
-        ]
-          .join(" ")
-          .toLowerCase();
+      if (searchTerm) {
+        filtered = filtered.filter((product) => {
+          const searchableFields = [
+            product.itemName || "",
+            product.brand || "",
+            product.category || "",
+            product.subcategory || "",
+            product.description || "",
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
 
-        return searchableFields.includes(searchTerm);
-      });
+          return searchableFields.includes(searchTerm);
+        });
+      }
     }
 
     // Sidebar Filters (user-selected filters)
     if (filters.selectedBrands.length > 0) {
       filtered = filtered.filter((product) =>
-        filters.selectedBrands.includes(product.brand)
+        product.brand && filters.selectedBrands.includes(product.brand)
       );
     }
 
     if (filters.selectedSubcategories.length > 0) {
       filtered = filtered.filter((product) =>
-        filters.selectedSubcategories.includes(product.subcategory)
+        product.subcategory && filters.selectedSubcategories.includes(product.subcategory)
       );
     }
 
@@ -239,23 +264,26 @@ function ShopContent() {
       );
       if (selectedRange) {
         filtered = filtered.filter(
-          (product) =>
-            product.amount >= selectedRange.min &&
-            product.amount <= selectedRange.max
+          (product) => {
+            const price = product.amount || 0;
+            return price >= selectedRange.min && price <= selectedRange.max;
+          }
         );
       }
     }
 
     // In stock filter
     if (filters.inStockOnly) {
-      filtered = filtered.filter((product) => product.inStock);
+      filtered = filtered.filter((product) => Boolean(product.inStock));
     }
 
     // Discount filter
     if (filters.discountOnly) {
       filtered = filtered.filter(
         (product) =>
-          product.originalPrice && product.originalPrice > product.amount
+          product.originalPrice && 
+          product.amount && 
+          product.originalPrice > product.amount
       );
     }
 
@@ -269,46 +297,40 @@ function ShopContent() {
     priceRanges,
   ]);
 
-  // Pagination calculations - YOUR EXACT LOGIC
+  // Pagination calculations
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
   const startIndex = (currentPage - 1) * productsPerPage;
   const endIndex = startIndex + productsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Pagination helper functions - YOUR EXACT LOGIC
+  // Pagination helper functions
   const goToPage = (page: number) => {
     setCurrentPage(page);
-    // Scroll to top of products section
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const getPageNumbers = () => {
-    const delta = 2; // Number of pages to show on each side of current page
+    const delta = 2;
     const pages: (number | string)[] = [];
     const rangeStart = Math.max(2, currentPage - delta);
     const rangeEnd = Math.min(totalPages - 1, currentPage + delta);
 
-    // Always include first page
     pages.push(1);
 
-    // Add ellipsis if needed
     if (rangeStart > 2) {
       pages.push("...");
     }
 
-    // Add range around current page
     for (let i = rangeStart; i <= rangeEnd; i++) {
       if (i !== 1 && i !== totalPages) {
         pages.push(i);
       }
     }
 
-    // Add ellipsis if needed
     if (rangeEnd < totalPages - 1) {
       pages.push("...");
     }
 
-    // Always include last page (if more than 1 page)
     if (totalPages > 1) {
       pages.push(totalPages);
     }
@@ -319,10 +341,10 @@ function ShopContent() {
   const currentAvailableSubcategories = useMemo(() => {
     let baseProducts = [...allProducts];
 
-    // Apply URL filters first
     if (categoryParam) {
       baseProducts = baseProducts.filter((product) => {
-        const productCategory = product.category?.toLowerCase() || "";
+        if (!product.category) return false;
+        const productCategory = product.category.toLowerCase();
         const searchCategory = categoryParam.toLowerCase();
         return (
           productCategory === searchCategory ||
@@ -334,18 +356,21 @@ function ShopContent() {
 
     if (searchParam) {
       const searchTerm = searchParam.toLowerCase().trim();
-      baseProducts = baseProducts.filter((product) => {
-        const searchableFields = [
-          product.itemName,
-          product.brand,
-          product.category,
-          product.subcategory,
-          product.description || "",
-        ]
-          .join(" ")
-          .toLowerCase();
-        return searchableFields.includes(searchTerm);
-      });
+      if (searchTerm) {
+        baseProducts = baseProducts.filter((product) => {
+          const searchableFields = [
+            product.itemName || "",
+            product.brand || "",
+            product.category || "",
+            product.subcategory || "",
+            product.description || "",
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return searchableFields.includes(searchTerm);
+        });
+      }
     }
 
     return [...new Set(baseProducts.map((p) => p.subcategory))]
@@ -353,13 +378,18 @@ function ShopContent() {
       .sort();
   }, [allProducts, categoryParam, searchParam]);
 
+  // ✅ FIXED: Better filter handlers
   const handleBrandChange = (brand: string, checked: boolean) => {
-    setFilters((prev) => ({
-      ...prev,
-      selectedBrands: checked
+    setFilters(prev => {
+      const newBrands = checked
         ? [...prev.selectedBrands, brand]
-        : prev.selectedBrands.filter((b) => b !== brand),
-    }));
+        : prev.selectedBrands.filter(b => b !== brand);
+      
+      return {
+        ...prev,
+        selectedBrands: newBrands,
+      };
+    });
   };
 
   const handleSubcategoryChange = (subcategory: string, checked: boolean) => {
@@ -378,9 +408,10 @@ function ShopContent() {
     }));
   };
 
+  // ✅ FIXED: Complete filter clearing
   const clearFilters = () => {
     setFilters({
-      selectedBrands: brandParam ? [brandParam] : [], // Keep URL brand if present
+      selectedBrands: [], // ✅ Always clear completely
       selectedSubcategories: [],
       selectedPriceRange: "all",
       inStockOnly: false,
@@ -391,6 +422,119 @@ function ShopContent() {
     setCurrentPage(1);
   };
 
+  // ✅ NEW: Individual filter clear functions
+  const clearBrandFilter = () => {
+    setFilters(prev => ({ ...prev, selectedBrands: [] }));
+    setBrandSearch("");
+  };
+
+  const clearSubcategoryFilter = () => {
+    setFilters(prev => ({ ...prev, selectedSubcategories: [] }));
+  };
+
+  const clearPriceFilter = () => {
+    setFilters(prev => ({ ...prev, selectedPriceRange: "all" }));
+  };
+
+  // ✅ NEW: Active Filters Component
+  const ActiveFilters = () => {
+    const hasActiveFilters = 
+      filters.selectedBrands.length > 0 ||
+      filters.selectedSubcategories.length > 0 ||
+      filters.selectedPriceRange !== "all" ||
+      filters.inStockOnly ||
+      filters.discountOnly;
+
+    if (!hasActiveFilters) return null;
+
+    return (
+      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Active Filters:</span>
+          <button
+            onClick={clearFilters}
+            className="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-1 rounded"
+          >
+            Clear All
+          </button>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          {/* Brand filters */}
+          {filters.selectedBrands.map(brand => (
+            <span
+              key={brand}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full"
+            >
+              {brand}
+              <button
+                onClick={() => handleBrandChange(brand, false)}
+                className="ml-1 hover:text-orange-900 font-bold"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          
+          {/* Subcategory filters */}
+          {filters.selectedSubcategories.map(sub => (
+            <span
+              key={sub}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+            >
+              {sub}
+              <button
+                onClick={() => handleSubcategoryChange(sub, false)}
+                className="ml-1 hover:text-blue-900 font-bold"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          
+          {/* Price range filter */}
+          {filters.selectedPriceRange !== "all" && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+              {priceRanges.find(r => r.id === filters.selectedPriceRange)?.label}
+              <button
+                onClick={clearPriceFilter}
+                className="ml-1 hover:text-green-900 font-bold"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          
+          {/* Stock filter */}
+          {filters.inStockOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+              In Stock Only
+              <button
+                onClick={() => setFilters(prev => ({ ...prev, inStockOnly: false }))}
+                className="ml-1 hover:text-purple-900 font-bold"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          
+          {/* Discount filter */}
+          {filters.discountOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+              Discount Only
+              <button
+                onClick={() => setFilters(prev => ({ ...prev, discountOnly: false }))}
+                className="ml-1 hover:text-yellow-900 font-bold"
+              >
+                ×
+              </button>
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Dynamic breadcrumbs based on URL parameters including brand
   const breadcrumbs = useMemo(() => {
     const crumbs = [
@@ -398,7 +542,6 @@ function ShopContent() {
       { name: "Shop", href: "/shop" },
     ];
 
-    // Add brand breadcrumb
     if (brandParam) {
       crumbs.push({
         name: `${brandParam} Products`,
@@ -605,8 +748,7 @@ function ShopContent() {
                       <input
                         type="text"
                         placeholder="Search For Brands"
-                        value={brandSearch}
-                        onChange={(e) => setBrandSearch(e.target.value)}
+                        onChange={(e) => debouncedSetBrandSearch(e.target.value)}
                         className="w-full px-3 py-3 pl-10 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-[#FF0000] focus:border-[#FF0000] min-h-[44px]"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -673,25 +815,14 @@ function ShopContent() {
                     </div>
 
                     {/* View More Link */}
-                    {allBrands.slice(0, brandsToShow).map((brand, index) => (
-                      <div key={index}>{brand}</div>
-                    ))}
-
-                    {allBrands.length > brandsToShow && (
+                    {filteredBrands.length > 10 && (
                       <button
-                        onClick={() => setBrandsToShow(brandsToShow + 10)}
+                        onClick={() => setShowAllBrands(!showAllBrands)}
                         className="text-sm text-[#FF0000] hover:text-[#FF0000] mt-4 font-medium min-h-[44px] px-2 py-2"
                       >
-                        View more ({allBrands.length - brandsToShow} more)
-                      </button>
-                    )}
-
-                    {brandsToShow > 10 && (
-                      <button
-                        onClick={() => setBrandsToShow(10)}
-                        className="text-sm text-gray-500 mt-2"
-                      >
-                        View less
+                        {showAllBrands
+                          ? "← View less"
+                          : `View more (${filteredBrands.length - 10} more)`}
                       </button>
                     )}
                   </div>
@@ -892,7 +1023,7 @@ function ShopContent() {
                 <div className="border-t p-4">
                   <button
                     onClick={() => setShowMobileFilters(false)}
-                    className="w-full bg-[#FF1000] text-white py-3 rounded-lg hover:bg[#FF0000] transition-colors font-medium min-h-[48px]"
+                    className="w-full bg-[#FF1000] text-white py-3 rounded-lg hover:bg-[#FF0000] transition-colors font-medium min-h-[48px]"
                   >
                     Apply Filters
                   </button>
@@ -985,7 +1116,7 @@ function ShopContent() {
 
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Desktop Filter Sidebar */}
-            <div className="hidden lg:block w-full lg:w-[24rem] lg:flex-shrink-0">
+            <div className="hidden lg:block w-full min-w-[18rem]  lg:max-w-[20rem] lg:flex-shrink-0">
               <div
                 className="rounded-lg shadow-sm border p-4 lg:p-6 lg:sticky lg:top-6"
                 style={{ backgroundColor: "var(--header_background)" }}
@@ -1014,8 +1145,7 @@ function ShopContent() {
                     <input
                       type="text"
                       placeholder="Search For Brands"
-                      value={brandSearch}
-                      onChange={(e) => setBrandSearch(e.target.value)}
+                      onChange={(e) => debouncedSetBrandSearch(e.target.value)}
                       className="w-full px-3 py-3 pl-10 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500 min-h-[44px]"
                     />
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1244,6 +1374,9 @@ function ShopContent() {
                   {currentPage > 1 && ` (Page ${currentPage} of ${totalPages})`}
                 </p>
               </div>
+
+              {/* ✅ NEW: Active Filters Component */}
+              <ActiveFilters />
 
               {/* Subcategory Quick Links - Only show if in category view */}
               {categoryParam &&
