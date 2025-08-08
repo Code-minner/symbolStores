@@ -181,7 +181,7 @@ export default function Footer() {
 
           {/* Help */}
           <div>
-            <h2 style={styles.mainHeading}>Help</h2>
+            <h2 style={styles.mainHeading}>Useful Links</h2>
             <a href="/dashboard?tab=profile">
               <h3 style={styles.minisubHeading}>Dashboard</h3>
             </a>

@@ -521,8 +521,8 @@ const categorySubItems: { [key: string]: string[] } = {
             >
               <div className="relative">
                 <svg
-                  width="17"
-                  height="15"
+                  width="19"
+                  height="18"
                   viewBox="0 0 50 51"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"

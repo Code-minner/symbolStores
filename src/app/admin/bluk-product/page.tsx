@@ -16,8 +16,11 @@ interface Product {
   brand: string;
   imageURL: string;
   slug: string;
+  sku: string; // ✅ ADDED: SKU field as required
   // Optional properties that may exist in uploaded JSON
   status?: string;
+  inStock?: boolean;
+  stockQuantity?: number; // ✅ ADDED: Stock quantity for inventory
   features?: string[];
   tags?: string[];
   images?: string[];
@@ -47,6 +50,7 @@ export default function UploadBulkProducts() {
       "subcategory",
       "brand",
       "imageURL",
+      "sku", // ✅ ADDED: SKU as required field
     ];
 
     requiredFields.forEach((field) => {
@@ -72,6 +76,24 @@ export default function UploadBulkProducts() {
       errors.push("Invalid image URL");
     }
 
+    // ✅ ADDED: SKU validation
+    if (product.sku && typeof product.sku === "string") {
+      const sku = product.sku.trim();
+      if (sku.length < 3) {
+        errors.push("SKU must be at least 3 characters long");
+      }
+      if (!/^[A-Za-z0-9\-_]+$/.test(sku)) {
+        errors.push("SKU can only contain letters, numbers, hyphens, and underscores");
+      }
+    }
+
+    // ✅ ADDED: Stock quantity validation
+    if (product.stockQuantity !== undefined) {
+      if (typeof product.stockQuantity !== "number" || product.stockQuantity < 0) {
+        errors.push("Stock quantity must be a non-negative number");
+      }
+    }
+
     return errors;
   };
 
@@ -82,6 +104,21 @@ export default function UploadBulkProducts() {
     } catch (_) {
       return false;
     }
+  };
+
+  // ✅ ADDED: Generate SKU if missing
+  const generateSKU = (product: any, index: number): string => {
+    if (product.sku && typeof product.sku === "string" && product.sku.trim()) {
+      return product.sku.trim().toUpperCase();
+    }
+    
+    // Auto-generate SKU from brand, category, and index
+    const brand = (product.brand || "GEN").substring(0, 3).toUpperCase();
+    const category = (product.category || "CAT").substring(0, 3).toUpperCase();
+    const timestamp = Date.now().toString().slice(-4);
+    const indexStr = String(index + 1).padStart(3, '0');
+    
+    return `${brand}-${category}-${timestamp}${indexStr}`;
   };
 
   const parseCSVData = async (file: File): Promise<Product[]> => {
@@ -131,7 +168,7 @@ export default function UploadBulkProducts() {
                   return [];
                 };
 
-                return {
+                const productData = {
                   itemName: mapField([
                     "itemName",
                     "name",
@@ -172,18 +209,57 @@ export default function UploadBulkProducts() {
                     "photo",
                   ]),
                   slug: mapField(["slug", "Slug"]) || "",
+                  // ✅ ADDED: SKU mapping with flexible column names
+                  sku: mapField([
+                    "sku",
+                    "SKU",
+                    "productCode",
+                    "product_code",
+                    "itemCode",
+                    "item_code",
+                    "Product Code",
+                    "Item Code"
+                  ]) || "",
                   status: mapField([
                     "status",
                     "Status",
                     "availability",
                     "Availability",
                   ]),
+                  // ✅ ADDED: Stock quantity mapping
+                  stockQuantity: parseInt(
+                    mapField([
+                      "stockQuantity",
+                      "stock_quantity",
+                      "stock",
+                      "quantity",
+                      "qty",
+                      "Stock Quantity",
+                      "Stock",
+                      "Quantity"
+                    ]) || "0"
+                  ),
+                  inStock: mapField([
+                    "inStock",
+                    "in_stock",
+                    "In Stock"
+                  ]) === true || mapField([
+                    "status",
+                    "Status"
+                  ])?.toLowerCase() === "in stock",
                   features: parseArrayField(mapField(["features", "Features"])),
                   tags: parseArrayField(mapField(["tags", "Tags"])),
                   images: parseArrayField(
                     mapField(["images", "Images", "image_urls", "Image URLs"])
                   ),
                 };
+
+                // Generate SKU if missing
+                if (!productData.sku) {
+                  productData.sku = generateSKU(productData, index);
+                }
+
+                return productData;
               }
             );
 
@@ -228,12 +304,32 @@ export default function UploadBulkProducts() {
           return;
         }
 
-        parsedProducts = json;
+        parsedProducts = json.map((product, index) => ({
+          ...product,
+          sku: product.sku || generateSKU(product, index)
+        }));
         setLastFileType("JSON");
       } else if (isCSV) {
         // Handle CSV files
         parsedProducts = await parseCSVData(file);
         setLastFileType("CSV");
+      }
+
+      // ✅ ADDED: Check for duplicate SKUs
+      const skuMap = new Map<string, number>();
+      const duplicateSKUs: string[] = [];
+
+      parsedProducts.forEach((product, index) => {
+        if (skuMap.has(product.sku)) {
+          duplicateSKUs.push(product.sku);
+        } else {
+          skuMap.set(product.sku, index);
+        }
+      });
+
+      if (duplicateSKUs.length > 0) {
+        alert(`Warning: Found duplicate SKUs in your file: ${[...new Set(duplicateSKUs)].join(', ')}\n\nEach product should have a unique SKU. Please fix and re-upload.`);
+        return;
       }
 
       // Validate products
@@ -302,7 +398,7 @@ export default function UploadBulkProducts() {
       errors: [],
     };
 
-    const productRef = collection(db, "products"); // Use batch processing for better performance
+    const productRef = collection(db, "products");
 
     const batchSize = 10;
     for (let i = 0; i < products.length; i += batchSize) {
@@ -313,14 +409,18 @@ export default function UploadBulkProducts() {
           try {
             // Generate slug and ID for each product
             const slug = generateSlug(product.itemName);
-            const itemId = `${slug}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`; // Prepare product data with additional fields
+            const itemId = `${slug}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+            // ✅ UPDATED: Prepare product data with SKU and stock fields
             const productData = {
               ...product,
               slug,
-              inStock: product.status === "in stock",
+              sku: product.sku.toUpperCase(), // Ensure SKU is uppercase
+              inStock: product.inStock !== false && (product.stockQuantity === undefined || product.stockQuantity > 0),
+              stockQuantity: product.stockQuantity || 0,
               createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(), // Ensure arrays are properly formatted
+              updatedAt: serverTimestamp(),
+              // Ensure arrays are properly formatted
               features: Array.isArray(product.features) ? product.features : [],
               tags: Array.isArray(product.tags) ? product.tags : [],
               images: Array.isArray(product.images)
@@ -343,7 +443,7 @@ export default function UploadBulkProducts() {
       setUploadProgress(
         Math.min(100, ((i + batchSize) / products.length) * 100)
       );
-    } // NEW CODE ADDED HERE
+    }
 
     if (results.success > 0) {
       try {
@@ -359,7 +459,8 @@ export default function UploadBulkProducts() {
 
     if (results.failed === 0) {
       setProducts([]);
-    } // Update the final alert message to reflect the cache clearing
+    }
+    
     alert("✅ Product upload completed and cache cleared!");
   };
 
@@ -459,16 +560,14 @@ export default function UploadBulkProducts() {
               <div className="mt-1 pl-4">
                 <p>
                   <strong>Required:</strong> itemName, amount, category,
-                  subcategory, brand, imageURL
+                  subcategory, brand, imageURL, <span className="text-red-600 font-semibold">sku</span>
                 </p>
                 <p>
-                  <strong>Optional:</strong> slug, status, features, tags,
-                  images
+                  <strong>Optional:</strong> slug, status, stockQuantity, inStock, features, tags, images
                 </p>
                 <p>
                   <em>
-                    Note: Column names are flexible (e.g., "name",
-                    "product_name", "title" all work for itemName)
+                    Note: Column names are flexible (e.g., "sku", "SKU", "productCode", "item_code" all work for sku)
                   </em>
                 </p>
               </div>
@@ -488,20 +587,19 @@ export default function UploadBulkProducts() {
                 <p className="font-medium mb-1">💡 Pro Tips:</p>
                 <ul className="space-y-1 text-xs">
                   <li>
-                    • CSV files from scraping tools work best with
-                    auto-detection
+                    • <strong className="text-red-600">SKUs must be unique</strong> - each product needs a distinct SKU for inventory tracking
                   </li>
                   <li>
-                    • Features and tags can be comma-separated in CSV (e.g.,
-                    "feature1,feature2,feature3")
+                    • Missing SKUs will be auto-generated using brand + category + timestamp
                   </li>
                   <li>
-                    • Invalid products will be skipped with detailed error
-                    reporting
+                    • CSV files from scraping tools work best with auto-detection
                   </li>
                   <li>
-                    • Large files are processed in batches for optimal
-                    performance
+                    • Features and tags can be comma-separated in CSV (e.g., "feature1,feature2,feature3")
+                  </li>
+                  <li>
+                    • Stock quantities help with inventory management and availability
                   </li>
                 </ul>
               </div>
@@ -530,25 +628,31 @@ export default function UploadBulkProducts() {
     "itemName": "iPhone 15 Pro",
     "amount": 999,
     "category": "Electronics",
-    "subcategory": "Smartphones",
+    "subcategory": "Smartphones", 
     "brand": "Apple",
     "imageURL": "https://example.com/iphone15.jpg",
+    "sku": "APL-IPH-15-PRO-128",
+    "stockQuantity": 50,
+    "inStock": true,
     "slug": "iphone-15-pro",
     "status": "in stock",
     "features": ["128GB", "Pro Camera", "Titanium"],
     "tags": ["premium", "mobile", "5G"],
     "images": [
-      "https://example.com/iphone15-1.jpg",
+      "https://example.com/iphone15-1.jpg", 
       "https://example.com/iphone15-2.jpg"
     ]
   },
   {
     "itemName": "MacBook Pro M3",
     "amount": 1999,
-    "category": "Electronics", 
+    "category": "Electronics",
     "subcategory": "Laptops",
-    "brand": "Apple",
-    "imageURL": "https://example.com/macbook.jpg"
+    "brand": "Apple", 
+    "imageURL": "https://example.com/macbook.jpg",
+    "sku": "APL-MBP-M3-16GB",
+    "stockQuantity": 25,
+    "inStock": true
   }
 ]`}
                 </pre>
@@ -556,12 +660,12 @@ export default function UploadBulkProducts() {
                   <span className="text-red-600 font-medium">
                     Required fields:
                   </span>{" "}
-                  itemName, amount, category, subcategory, brand, imageURL
+                  itemName, amount, category, subcategory, brand, imageURL, <strong className="text-red-600">sku</strong>
                   <br />
                   <span className="text-blue-600 font-medium">
                     Optional fields:
                   </span>{" "}
-                  slug, status, features, tags, images
+                  slug, status, stockQuantity, inStock, features, tags, images
                 </div>
               </div>
             </details>
@@ -584,109 +688,53 @@ export default function UploadBulkProducts() {
                   <table className="text-xs border border-gray-300 bg-white rounded">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border border-gray-300 px-2 py-1">
-                          itemName
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1">
-                          amount
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1">
-                          category
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1">
-                          subcategory
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1">
-                          brand
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1">
-                          imageURL
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1">
-                          features
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1">
-                          tags
-                        </th>
+                        <th className="border border-gray-300 px-2 py-1">itemName</th>
+                        <th className="border border-gray-300 px-2 py-1">amount</th>
+                        <th className="border border-gray-300 px-2 py-1">category</th>
+                        <th className="border border-gray-300 px-2 py-1">subcategory</th>
+                        <th className="border border-gray-300 px-2 py-1">brand</th>
+                        <th className="border border-gray-300 px-2 py-1">imageURL</th>
+                        <th className="border border-gray-300 px-2 py-1 bg-red-50 font-bold">sku</th>
+                        <th className="border border-gray-300 px-2 py-1">stockQuantity</th>
+                        <th className="border border-gray-300 px-2 py-1">features</th>
+                        <th className="border border-gray-300 px-2 py-1">tags</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="border border-gray-300 px-2 py-1">
-                          iPhone 15 Pro
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          999
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          Electronics
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          Smartphones
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          Apple
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          https://example.com/iphone.jpg
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          128GB,Pro Camera,Titanium
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          premium,mobile,5G
-                        </td>
+                        <td className="border border-gray-300 px-2 py-1">iPhone 15 Pro</td>
+                        <td className="border border-gray-300 px-2 py-1">999</td>
+                        <td className="border border-gray-300 px-2 py-1">Electronics</td>
+                        <td className="border border-gray-300 px-2 py-1">Smartphones</td>
+                        <td className="border border-gray-300 px-2 py-1">Apple</td>
+                        <td className="border border-gray-300 px-2 py-1">https://example.com/iphone.jpg</td>
+                        <td className="border border-gray-300 px-2 py-1 bg-red-50 font-mono">APL-IPH-15-PRO</td>
+                        <td className="border border-gray-300 px-2 py-1">50</td>
+                        <td className="border border-gray-300 px-2 py-1">128GB,Pro Camera,Titanium</td>
+                        <td className="border border-gray-300 px-2 py-1">premium,mobile,5G</td>
                       </tr>
                       <tr>
-                        <td className="border border-gray-300 px-2 py-1">
-                          MacBook Pro M3
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          1999
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          Electronics
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          Laptops
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          Apple
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          https://example.com/macbook.jpg
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          M3 Chip,16GB RAM
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          laptop,professional
-                        </td>
+                        <td className="border border-gray-300 px-2 py-1">MacBook Pro M3</td>
+                        <td className="border border-gray-300 px-2 py-1">1999</td>
+                        <td className="border border-gray-300 px-2 py-1">Electronics</td>
+                        <td className="border border-gray-300 px-2 py-1">Laptops</td>
+                        <td className="border border-gray-300 px-2 py-1">Apple</td>
+                        <td className="border border-gray-300 px-2 py-1">https://example.com/macbook.jpg</td>
+                        <td className="border border-gray-300 px-2 py-1 bg-red-50 font-mono">APL-MBP-M3-16GB</td>
+                        <td className="border border-gray-300 px-2 py-1">25</td>
+                        <td className="border border-gray-300 px-2 py-1">M3 Chip,16GB RAM</td>
+                        <td className="border border-gray-300 px-2 py-1">laptop,professional</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <div className="mt-2 text-xs">
-                  <p>
-                    <span className="text-blue-600 font-medium">
-                      Flexible column names:
-                    </span>
-                  </p>
-                  <p>
-                    • <strong>itemName:</strong> name, product_name, title, Item
-                    Name, Product Name
-                  </p>
-                  <p>
-                    • <strong>amount:</strong> price, cost, Amount, Price, Cost
-                  </p>
-                  <p>
-                    • <strong>imageURL:</strong> image_url, image, Image URL,
-                    photo
-                  </p>
-                  <p>
-                    • <strong>Arrays:</strong> Use comma-separated values for
-                    features and tags
-                  </p>
+                  <p><span className="text-blue-600 font-medium">Flexible column names:</span></p>
+                  <p>• <strong>sku:</strong> sku, SKU, productCode, product_code, itemCode, item_code</p>
+                  <p>• <strong>stockQuantity:</strong> stockQuantity, stock_quantity, stock, quantity, qty</p>
+                  <p>• <strong>itemName:</strong> name, product_name, title, Item Name, Product Name</p>
+                  <p>• <strong>amount:</strong> price, cost, Amount, Price, Cost</p>
+                  <p>• <strong>Arrays:</strong> Use comma-separated values for features and tags</p>
                 </div>
               </div>
             </details>
@@ -716,6 +764,9 @@ export default function UploadBulkProducts() {
                           subcategory: "Smartphones",
                           brand: "Apple",
                           imageURL: "https://example.com/iphone15.jpg",
+                          sku: "APL-IPH-15-PRO-128",
+                          stockQuantity: 50,
+                          inStock: true,
                           slug: "iphone-15-pro",
                           status: "in stock",
                           features: ["128GB", "Pro Camera", "Titanium"],
@@ -729,6 +780,9 @@ export default function UploadBulkProducts() {
                           subcategory: "Laptops",
                           brand: "Apple",
                           imageURL: "https://example.com/macbook.jpg",
+                          sku: "APL-MBP-M3-16GB",
+                          stockQuantity: 25,
+                          inStock: true,
                           slug: "macbook-pro-m3",
                           status: "in stock",
                           features: ["M3 Chip", "16GB RAM"],
@@ -753,10 +807,10 @@ export default function UploadBulkProducts() {
                   </button>
                   <button
                     onClick={() => {
-                      const csvContent = `itemName,amount,category,subcategory,brand,imageURL,status,features,tags
-iPhone 15 Pro,999,Electronics,Smartphones,Apple,https://example.com/iphone15.jpg,in stock,"128GB,Pro Camera,Titanium","premium,mobile,5G"
-MacBook Pro M3,1999,Electronics,Laptops,Apple,https://example.com/macbook.jpg,in stock,"M3 Chip,16GB RAM","laptop,professional"
-Samsung Galaxy S24,799,Electronics,Smartphones,Samsung,https://example.com/galaxy.jpg,in stock,"256GB,AI Camera","android,mobile"`;
+                      const csvContent = `itemName,amount,category,subcategory,brand,imageURL,sku,stockQuantity,status,features,tags
+iPhone 15 Pro,999,Electronics,Smartphones,Apple,https://example.com/iphone15.jpg,APL-IPH-15-PRO-128,50,in stock,"128GB,Pro Camera,Titanium","premium,mobile,5G"
+MacBook Pro M3,1999,Electronics,Laptops,Apple,https://example.com/macbook.jpg,APL-MBP-M3-16GB,25,in stock,"M3 Chip,16GB RAM","laptop,professional"
+Samsung Galaxy S24,799,Electronics,Smartphones,Samsung,https://example.com/galaxy.jpg,SAM-GAL-S24-256,75,in stock,"256GB,AI Camera","android,mobile"`;
                       const blob = new Blob([csvContent], { type: "text/csv" });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement("a");
@@ -818,18 +872,34 @@ Samsung Galaxy S24,799,Electronics,Smartphones,Samsung,https://example.com/galax
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-2">Name</th>
+                        <th className="text-left p-2">SKU</th>
                         <th className="text-left p-2">Category</th>
                         <th className="text-left p-2">Brand</th>
                         <th className="text-left p-2">Amount</th>
+                        <th className="text-left p-2">Stock</th>
                       </tr>
                     </thead>
                     <tbody>
                       {products.slice(0, 10).map((product, index) => (
                         <tr key={index} className="border-b">
                           <td className="p-2">{product.itemName}</td>
+                          <td className="p-2">
+                            <code className="bg-gray-100 px-2 py-1 rounded text-xs">
+                              {product.sku}
+                            </code>
+                          </td>
                           <td className="p-2">{product.category}</td>
                           <td className="p-2">{product.brand}</td>
                           <td className="p-2">${product.amount}</td>
+                          <td className="p-2">
+                            {product.stockQuantity !== undefined ? (
+                              <span className={product.stockQuantity > 0 ? "text-green-600" : "text-red-600"}>
+                                {product.stockQuantity}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -896,7 +966,7 @@ Samsung Galaxy S24,799,Electronics,Smartphones,Samsung,https://example.com/galax
                 <div className="mb-4 p-3 bg-green-50 border-l-4 border-green-400 rounded-r-lg">
                   <p className="text-green-700 font-medium">
                     Great job! All {uploadResult.success} products have been
-                    successfully uploaded to your store.
+                    successfully uploaded to your store with unique SKUs for inventory tracking.
                   </p>
                 </div>
               )}
@@ -924,7 +994,7 @@ Samsung Galaxy S24,799,Electronics,Smartphones,Samsung,https://example.com/galax
                   <div className="max-h-32 overflow-y-auto">
                     {uploadResult.errors.map((error, index) => (
                       <div key={index} className="text-sm text-red-700 mb-1">
-                        • {error.product.itemName}: {error.error}
+                        • {error.product.itemName} (SKU: {error.product.sku}): {error.error}
                       </div>
                     ))}
                   </div>

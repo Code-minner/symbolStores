@@ -50,10 +50,13 @@ function FlutterwavePayment({
         });
       });
 
-      const calculatedItemsSubtotal = state.items.reduce((sum: number, item: CartItem) => {
-        const itemTotal = item.amount * item.quantity;
-        return sum + itemTotal;
-      }, 0);
+      const calculatedItemsSubtotal = state.items.reduce(
+        (sum: number, item: CartItem) => {
+          const itemTotal = item.amount * item.quantity;
+          return sum + itemTotal;
+        },
+        0
+      );
 
       if (isNaN(calculatedItemsSubtotal)) {
         console.error("❌ NaN detected in cart calculation!");
@@ -63,24 +66,26 @@ function FlutterwavePayment({
 
       // ✅ Defensive mapping to ensure all CartItem properties are present
       // This is crucial if your cart items might sometimes lack these properties
-      const cartItemsForPayment: CartItem[] = state.items.map(item => ({
+      const cartItemsForPayment: CartItem[] = state.items.map((item) => ({
         id: item.id,
         itemName: item.itemName,
         quantity: item.quantity,
         amount: item.amount,
         imageURL: item.imageURL,
         sku: item.sku,
-        category: item.category || 'unknown', // Provide default if missing
-        subcategory: item.subcategory || 'unknown',
-        brand: item.brand || 'unknown',
-        slug: item.slug || item.itemName.toLowerCase().replace(/\s+/g, '-'), // Generate slug if missing
+        category: item.category || "unknown", // Provide default if missing
+        subcategory: item.subcategory || "unknown",
+        brand: item.brand || "unknown",
+        slug: item.slug || item.itemName.toLowerCase().replace(/\s+/g, "-"), // Generate slug if missing
         inStock: item.inStock || true, // Provide default if missing
         originalPrice: item.originalPrice, // Optional, can be undefined
         warranty: item.warranty, // Optional, can be undefined
       }));
 
-
-      console.log("🔄 Cart items passed to Flutterwave hook (defensive map):", cartItemsForPayment);
+      console.log(
+        "🔄 Cart items passed to Flutterwave hook (defensive map):",
+        cartItemsForPayment
+      );
 
       const paymentRequestData = {
         email: orderData.email || "customer@example.com",
@@ -152,7 +157,7 @@ function FlutterwavePayment({
     if (paymentAttempted && error) {
       return "TRY AGAIN";
     }
-    return `PAY ${state.finalTotal.toLocaleString('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 })} WITH FLUTTERWAVE`;
+    return `PAY ${state.finalTotal.toLocaleString("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 })} WITH FLUTTERWAVE`;
   };
 
   const getButtonColor = () => {
@@ -267,17 +272,17 @@ function BankTransferPayment({
       console.log("🛒 Original orderData.items:", orderData.items);
 
       // ✅ Defensive mapping to ensure all CartItem properties are present
-      const cartItemsForBackend: CartItem[] = cartState.items.map(item => ({
+      const cartItemsForBackend: CartItem[] = cartState.items.map((item) => ({
         id: item.id,
         itemName: item.itemName,
         quantity: item.quantity,
         amount: item.amount,
         imageURL: item.imageURL,
         sku: item.sku,
-        category: item.category || 'unknown', // Provide default if missing
-        subcategory: item.subcategory || 'unknown',
-        brand: item.brand || 'unknown',
-        slug: item.slug || item.itemName.toLowerCase().replace(/\s+/g, '-'), // Generate slug if missing
+        category: item.category || "unknown", // Provide default if missing
+        subcategory: item.subcategory || "unknown",
+        brand: item.brand || "unknown",
+        slug: item.slug || item.itemName.toLowerCase().replace(/\s+/g, "-"), // Generate slug if missing
         inStock: item.inStock || true,
         originalPrice: item.originalPrice,
         warranty: item.warranty,
@@ -311,12 +316,17 @@ function BankTransferPayment({
         user_id: orderData.userId,
       };
 
-      console.log("📤 Complete payload being sent (Bank Transfer):", transferData);
+      console.log(
+        "📤 Complete payload being sent (Bank Transfer):",
+        transferData
+      );
 
       const result = await createBankTransferOrder(transferData);
 
       if (result.success && result.bankDetails && result.orderReference) {
-        console.log("🏦 Bank transfer order created successfully, skipping details page");
+        console.log(
+          "🏦 Bank transfer order created successfully, skipping details page"
+        );
 
         const amountForSuccess = cartState.finalTotal;
 
@@ -360,7 +370,12 @@ function BankTransferPayment({
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 5h18l-2 7H5L3 5zm0 0L2 3m7 4v10m4-10v10" />
             </svg>
-            BANK TRANSFER - {cartState.finalTotal.toLocaleString('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 })}
+            BANK TRANSFER -{" "}
+            {cartState.finalTotal.toLocaleString("en-NG", {
+              style: "currency",
+              currency: "NGN",
+              minimumFractionDigits: 0,
+            })}
           </>
         )}
       </button>
@@ -446,7 +461,7 @@ function PaymentMethodSelector({
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
                 <span className="text-green-600 font-medium">
                   ✅ Instant confirmation
                 </span>
@@ -488,7 +503,7 @@ function PaymentMethodSelector({
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
                 <span className="text-yellow-600 font-medium">
                   ⏱️ Manual confirmation (24hrs)
                 </span>
@@ -571,7 +586,10 @@ export default function ReviewPage() {
 
     const amountToPass = state.finalTotal;
 
-    console.log("💰 Using calculated finalTotal from cart for redirect:", amountToPass);
+    console.log(
+      "💰 Using calculated finalTotal from cart for redirect:",
+      amountToPass
+    );
 
     const params = new URLSearchParams({
       orderId: result.orderId || result.orderReference,
@@ -627,20 +645,20 @@ export default function ReviewPage() {
     address: displayData.address.fullAddress,
     totalAmount: state.finalTotal, // Final total for payment gateways
     // ✅ DEFENSIVE MAPPING: Ensure all items conform to CartItem fully
-    items: state.items.map(item => ({
-        id: item.id,
-        itemName: item.itemName,
-        quantity: item.quantity,
-        amount: item.amount,
-        imageURL: item.imageURL,
-        sku: item.sku,
-        category: item.category || 'unknown', // Provide default if potentially missing from cart state
-        subcategory: item.subcategory || 'unknown',
-        brand: item.brand || 'unknown',
-        slug: item.slug || item.itemName.toLowerCase().replace(/\s+/g, '-'), // Generate slug if missing
-        inStock: item.inStock || true,
-        originalPrice: item.originalPrice,
-        warranty: item.warranty,
+    items: state.items.map((item) => ({
+      id: item.id,
+      itemName: item.itemName,
+      quantity: item.quantity,
+      amount: item.amount,
+      imageURL: item.imageURL,
+      sku: item.sku,
+      category: item.category || "unknown", // Provide default if potentially missing from cart state
+      subcategory: item.subcategory || "unknown",
+      brand: item.brand || "unknown",
+      slug: item.slug || item.itemName.toLowerCase().replace(/\s+/g, "-"), // Generate slug if missing
+      inStock: item.inStock || true,
+      originalPrice: item.originalPrice,
+      warranty: item.warranty,
     })),
     orderNotes: displayData.orderNotes || "",
     userId: userData?.uid, // ✅ Use userData.uid as the user's unique ID
@@ -800,18 +818,26 @@ export default function ReviewPage() {
 
                 {/* New: Display Subtotal, Shipping, Tax */}
                 <div className="border-t border-gray-200 pt-4 space-y-2 text-sm text-gray-700">
-                    <div className="flex justify-between">
-                        <span>Subtotal (Items)</span>
-                        <span>{formatPrice(state.totalAmount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span>Shipping</span>
-                        <span>{formatPrice(state.shippingCost)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span>Tax ({state.totalAmount > 0 ? (state.taxAmount / state.totalAmount * 100).toFixed(2) : 0}%)</span>
-                        <span>{formatPrice(state.taxAmount)}</span>
-                    </div>
+                  <div className="flex justify-between">
+                    <span>Subtotal (Items)</span>
+                    <span>{formatPrice(state.totalAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Shipping</span>
+                    <span>{formatPrice(state.shippingCost)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>
+                      Tax (
+                      {state.totalAmount > 0
+                        ? ((state.taxAmount / state.totalAmount) * 100).toFixed(
+                            2
+                          )
+                        : 0}
+                      %)
+                    </span>
+                    <span>{formatPrice(state.taxAmount)}</span>
+                  </div>
                 </div>
 
                 <div className="border-t border-gray-200 pt-4 mt-4">
@@ -838,7 +864,10 @@ export default function ReviewPage() {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <p className="text-sm text-gray-600">
                   By proceeding with payment, you agree to our{" "}
-                  <Link href="/terms-and-conditions" className="text-blue-600 hover:text-blue-700 underline">
+                  <Link
+                    href="/terms-and-conditions"
+                    className="text-blue-600 hover:text-blue-700 underline"
+                  >
                     Terms and Conditions
                   </Link>
                   .

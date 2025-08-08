@@ -431,7 +431,7 @@ function OrderSuccessContent() {
       } else {
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
               <div className="flex items-center">
                 <Icon icon="mdi:bank" className="w-8 h-8 text-blue-500 mr-4" />
                 <div>

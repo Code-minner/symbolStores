@@ -135,7 +135,7 @@ const getCompanyLogoHtml = () => {
            alt="${COMPANY_NAME}" 
            style="width: 48px; height: 48px; border-radius: 12px; display: block; margin: 0 auto; object-fit: contain;"
            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-      <div style="width: 48px; height: 48px; background-color: rgba(255,255,255,0.15); border-radius: 12px; margin: 0 auto; display: none; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: white;">
+      <div style="width: 55px; height: 55px; background-color: rgba(255,255,255,0.15); margin: 0 auto; display: none; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: white;">
         ${FALLBACK_LOGO}
       </div>
     </div>
@@ -181,7 +181,7 @@ const getProfessionalEmailStyles = () => `
     .email-content { padding: 0; }
     
     /* Professional Header */
-    .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: #ffffff; padding: 32px 24px; text-align: center; position: relative; }
+    .header { background: linear-gradient(135deg, #e3e3e4ff 0%, #dae7fcff 100%); color: #ffffff; padding: 32px 24px; text-align: center; position: relative; }
     .header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>'); opacity: 0.1; }
     .header-content { position: relative; z-index: 1; }
     .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px; }
