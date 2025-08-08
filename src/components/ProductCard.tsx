@@ -427,7 +427,7 @@ export default function ProductCard({
               <button
                 onClick={handleAddToCart}
                 disabled={!isInStock}
-                className="text-[8px] sm:text-[12px] md:text-[13px] lg:text-[14px] py-2 sm:py-2 px-1 sm:px-3"
+                className="text-[8px] sm:text-[12px] md:text-[13px] lg:text-[13px] py-2 sm:py-2 px-1 sm:px-3"
                 style={{
                   flex: 1,
                   border: `1px solid ${isInStock ? "#FF0000" : "#9CA3AF"}`,
