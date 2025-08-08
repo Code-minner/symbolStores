@@ -375,7 +375,8 @@ export default function CheckoutPage() {
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Region/State <span className="text-red-500">*</span>
                           </label>
-                          <select
+                          <input
+                            type="text"
                             value={billingInfo.region}
                             onChange={(e) =>
                               handleInputChange(
@@ -384,22 +385,18 @@ export default function CheckoutPage() {
                                 e.target.value
                               )
                             }
+                            placeholder="Enter your state"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             required
-                          >
-                            <option value="">Select</option>
-                            <option value="lagos">Lagos</option>
-                            <option value="abuja">Abuja</option>
-                            <option value="kano">Kano</option>
-                            <option value="rivers">Rivers</option>
-                            <option value="ogun">Ogun</option>
-                          </select>
+                          />
                         </div>
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             City <span className="text-red-500">*</span>
                           </label>
-                          <select
+                          <input
+                            type="text"
                             value={billingInfo.city}
                             onChange={(e) =>
                               handleInputChange(
@@ -408,18 +405,10 @@ export default function CheckoutPage() {
                                 e.target.value
                               )
                             }
+                            placeholder="Enter your city"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             required
-                          >
-                            <option value="">Select</option>
-                            <option value="ikeja">Ikeja</option>
-                            <option value="victoria-island">
-                              Victoria Island
-                            </option>
-                            <option value="lekki">Lekki</option>
-                            <option value="surulere">Surulere</option>
-                            <option value="yaba">Yaba</option>
-                          </select>
+                          />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
