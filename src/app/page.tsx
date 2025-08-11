@@ -377,7 +377,7 @@ export default function Home() {
                 </div>
                 <div className="relative w-full h-[350px]  mb-4">
                   <Image
-                    src="/assets/image 15.png"
+                    src="/assets/image 12.png"
                     alt="Deals of the Day"
                     fill
                     className="object-scale"
@@ -387,29 +387,29 @@ export default function Home() {
 
               {/* desktop view */}
               <div className="hidden sm:flex justify-between items-center mt-4 mb-6">
-                <div className="relative w-full h-[200px] sm:h-[30vh] mb-4">
+                <div className="relative w-full h-[200px] sm:h-[300px] mb-4">
                   <Image
                     src="/assets/image 14.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-contain"
+                    className="object-scale object-top"
                   />
                 </div>
-                <div className="relative w-full h-[200px] sm:h-[30vh] mb-4">
+                <div className="relative w-full h-[200px] sm:h-[300px] mb-4">
                   <Image
                     src="/assets/image 15.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-contain object-top"
+                    className="object-scale object-top"
                   />
                 </div>
 
-                <div className="relative w-full h-[200px] hidden sm:block sm:h-[30vh] mb-4">
+                <div className="relative w-full h-[200px] hidden sm:block sm:h-[300px]  mb-4">
                   <Image
                     src="/assets/image 13.png"
                     alt="Deals of the Day"
                     fill
-                    className="object-contain object-top"
+                    className="object-scale object-top"
                   />
                 </div>
               </div>
@@ -451,7 +451,7 @@ export default function Home() {
                 src="/assets/image 12.png"
                 alt="Deals of the Day"
                 fill
-                className="object-contain"
+                className="object-contain object-top"
               />
             </div>
           </div>
