@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination, Autoplay } from "swiper/modules";
 import Image from "next/image";
@@ -8,6 +9,9 @@ import "swiper/css";
 import "swiper/css/pagination";
 
 const HeroCarousel = () => {
+
+    const router = useRouter(); 
+
   const slides = [
     {
       id: 1,
@@ -29,10 +33,14 @@ const HeroCarousel = () => {
     { id: 5, image: "/assets/washing machine.png", alt: "washing" },
     { id: 6, image: "/assets/audiobass.png", alt: "Best Sellers" },
   ];
+  
 
   return (
     // ✅ ULTRA-AGGRESSIVE: Outer boundary that absolutely prevents any overflow
-    <div className="w-full overflow-hidden" style={{ position: 'relative', maxWidth: '100vw' }}>
+    <div
+      className="w-full overflow-hidden"
+      style={{ position: "relative", maxWidth: "100vw" }}
+    >
       {/* ✅ FIXED: Desktop full-width, mobile keeps padding */}
       <div className="w-full px-2 sm:px-4 lg:px-0 py-12 relative overflow-hidden">
         <div className="w-full max-w-[calc(100vw-48px)] sm:max-w-[calc(100vw-64px)] md:max-w-[calc(100vw-80px)] lg:max-w-full xl:max-w-full mx-auto overflow-hidden">
@@ -66,13 +74,13 @@ const HeroCarousel = () => {
                     spaceBetween: 0,
                   },
                 }}
-                pagination={{ 
+                pagination={{
                   clickable: true,
                   dynamicBullets: true,
                 }}
-                autoplay={{ 
-                  delay: 4000, 
-                  disableOnInteraction: false 
+                autoplay={{
+                  delay: 4000,
+                  disableOnInteraction: false,
                 }}
                 // ✅ FIXED: Prevent left shifting and positioning issues
                 loop={true}
@@ -83,8 +91,8 @@ const HeroCarousel = () => {
                 centerInsufficientSlides={false}
                 className="hero-carousel-swiper"
                 style={{
-                  overflow: 'hidden',
-                  width: '100%'
+                  overflow: "hidden",
+                  width: "100%",
                 }}
               >
                 {slides.map((slide) => (
@@ -106,12 +114,9 @@ const HeroCarousel = () => {
 
                         {/* Bottom Bar with Button */}
                         <div className="w-[90%]  backdrop-blur-sm px-4 py-2 sm:py-3 flex border border-gray-200 justify-end absolute rounded-[10px]  bottom-[25px] right-[15px] ">
-                          <button 
-                            className="bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-1  sm:py-2 rounded-[4px] transition-colors duration-200 whitespace-nowrap"
-                            onClick={() => {
-                              // Add your shop navigation logic here
-                              console.log('Shop with us clicked');
-                            }}
+                          <button
+                            className="bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-1 sm:py-2 rounded-[4px] transition-colors duration-200 whitespace-nowrap"
+                            onClick={() => router.push("/shop")}
                           >
                             SHOP WITH US
                           </button>
@@ -131,7 +136,7 @@ const HeroCarousel = () => {
           body {
             overflow-x: hidden !important;
           }
-          
+
           /* ✅ ELIMINATE: Any inherited margins */
           .hero-carousel-swiper {
             overflow: hidden !important;
@@ -143,11 +148,11 @@ const HeroCarousel = () => {
             /* ✅ RESET: Any inherited spacing */
             padding: 0 !important;
           }
-          
+
           .hero-carousel-swiper * {
             box-sizing: border-box !important;
           }
-          
+
           .hero-carousel-swiper .swiper-wrapper {
             align-items: stretch !important;
             box-sizing: border-box !important;
@@ -157,7 +162,7 @@ const HeroCarousel = () => {
             margin: 0 !important;
             padding: 0 !important;
           }
-          
+
           .hero-carousel-swiper .swiper-slide {
             height: auto !important;
             display: flex !important;
@@ -172,14 +177,14 @@ const HeroCarousel = () => {
             margin: 0 !important;
             padding: 0 2px !important;
           }
-          
+
           .hero-carousel-swiper .swiper-slide > div {
             width: 100% !important;
             height: 100% !important;
             overflow: hidden !important;
             box-sizing: border-box !important;
           }
-          
+
           .hero-carousel-swiper .swiper-pagination {
             margin-top: 40px !important;
             position: relative !important;
@@ -188,7 +193,7 @@ const HeroCarousel = () => {
             max-width: 100% !important;
             overflow: hidden !important;
           }
-          
+
           .hero-carousel-swiper .swiper-pagination-bullet {
             background: rgba(156, 163, 175, 0.4) !important;
             width: 10px !important;
@@ -197,31 +202,31 @@ const HeroCarousel = () => {
             transition: all 0.3s ease !important;
             opacity: 1 !important;
           }
-          
+
           .hero-carousel-swiper .swiper-pagination-bullet-active {
             background: #ef4444 !important;
             transform: scale(1.2) !important;
           }
-          
+
           /* ✅ ULTRA-TIGHT: Even more aggressive viewport calculations */
           @media (max-width: 479px) {
             .hero-carousel-swiper {
               max-width: calc(100vw - 48px) !important;
             }
           }
-          
+
           @media (min-width: 480px) and (max-width: 767px) {
             .hero-carousel-swiper {
               max-width: calc(100vw - 64px) !important;
             }
           }
-          
+
           @media (min-width: 768px) and (max-width: 1023px) {
             .hero-carousel-swiper {
               max-width: calc(100vw - 80px) !important;
             }
           }
-          
+
           @media (min-width: 1024px) {
             .hero-carousel-swiper {
               max-width: 1380px !important;
