@@ -430,14 +430,12 @@ export default function Home() {
                     <li>Cooling - Frost‑free, Multi‑Air Flow</li>
                     <li>Modes - Super‑Cool, Super‑Freeze, Holiday, etc.</li>
                     <li>Water / Ice Feature - 2L reservoir, twist ice maker</li>
-                    <li>Alarm - Door‑opening alarm</li>
                     <li>Dimensions - 910×641×1780 mm</li>
-                    <li>Noise Level - ≤ 43 dB</li>
                     <li>Warranty - 36–48 month</li>
                   </ul>
 
                   <div>
-                    <h2 className="text-[18px] mb-4">₦ 1,140,000</h2>
+                    <h2 className="text-[18px] mb-4">₦1,140,000</h2>
                     <button className="bg-[#FF0000] text-[14px] px-4 py-2 border-2 border-[#FF0000] text-[#fff]  rounded-lg shadow hover:bg-[#FF0000] hover:text-white transition">
                       View More
                     </button>
