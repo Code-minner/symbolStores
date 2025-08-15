@@ -1,4 +1,4 @@
-// src/lib/orderService.ts - Enhanced for Both Payment Methods
+// src/lib/orderService.ts - Enhanced for Both Payment Methods (NO EMAIL IMPORTS)
 import { 
   collection, 
   query, 
@@ -96,6 +96,32 @@ interface OrderResult {
   error?: string;
 }
 
+// Helper function to send emails via API
+async function sendEmailViaAPI(type: string, orderData: any): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        orderData
+      })
+    });
+
+    if (response.ok) {
+      return { success: true };
+    } else {
+      const errorData = await response.json();
+      return { success: false, error: errorData.error || 'Failed to send email' };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown email error' 
+    };
+  }
+}
+
 export class OrderService {
   /**
    * Complete Flutterwave payment and create order
@@ -134,13 +160,11 @@ export class OrderService {
       const docRef = await addDoc(collection(db, 'orders'), orderData);
       console.log('✅ Order saved to Firestore with ID:', docRef.id);
       
-      // Send confirmation emails
+      // Send confirmation emails via API (NO direct imports)
       let emailSent = false;
       let adminEmailSent = false;
 
       try {
-        const { EmailService } = await import('@/lib/email');
-        
         const emailOrderData = {
           orderId,
           customerName: customerInfo.name,
@@ -159,37 +183,26 @@ export class OrderService {
           },
         };
 
-        await EmailService.sendOrderConfirmation(emailOrderData);
-        emailSent = true;
-        console.log('✅ Order confirmation email sent');
-        
-        // ✅ FIXED: Use existing sendAdminNotification with correct parameters
-        try {
-          await EmailService.sendAdminNotification({
-            orderId,
-            customerName: customerInfo.name,
-            customerEmail: customerInfo.email,
-            customerPhone: customerInfo.phone, // ✅ ADDED: Missing customerPhone field
-            amount: paymentData.amount,
-            items: cartItems.map(item => ({
-              itemName: item.itemName,
-              quantity: item.quantity,
-              amount: item.amount
-            })),
-            bankDetails: {
-              accountName: 'N/A',
-              accountNumber: 'N/A',
-              bankName: 'Flutterwave Payment',
-            },
-          });
+        // Send customer confirmation email via API
+        const customerEmailResult = await sendEmailViaAPI('order_confirmation', emailOrderData);
+        if (customerEmailResult.success) {
+          emailSent = true;
+          console.log('✅ Order confirmation email sent via API');
+        } else {
+          console.error('❌ Failed to send confirmation email via API:', customerEmailResult.error);
+        }
+
+        // Send admin notification email via API
+        const adminEmailResult = await sendEmailViaAPI('admin_notification', emailOrderData);
+        if (adminEmailResult.success) {
           adminEmailSent = true;
-          console.log('✅ Admin notification email sent');
-        } catch (adminEmailError) {
-          console.error('❌ Failed to send admin email:', adminEmailError);
+          console.log('✅ Admin notification email sent via API');
+        } else {
+          console.error('❌ Failed to send admin email via API:', adminEmailResult.error);
         }
         
       } catch (emailError) {
-        console.error('❌ Failed to send confirmation email:', emailError);
+        console.error('❌ Failed to send emails:', emailError);
       }
 
       return {
@@ -214,109 +227,106 @@ export class OrderService {
   /**
    * Get all orders for a user from both collections
    */
-/**
- * Get all orders for a user from both collections
- */
-static async getUserOrders(userId: string, userEmail?: string): Promise<Order[]> {
-  try {
-    const orders: Order[] = [];
-
-    // 1. Get Flutterwave orders
+  static async getUserOrders(userId: string, userEmail?: string): Promise<Order[]> {
     try {
-      const flutterwaveQuery = query(
-        collection(db, 'orders'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const flutterwaveSnapshot = await getDocs(flutterwaveQuery);
-      
-      flutterwaveSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        orders.push({
-          id: doc.id,
-          orderId: data.orderId || doc.id,
-          userId: data.userId,
-          status: data.status || 'completed',
-          date: data.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
-          total: `₦${(data.totalAmount || data.amount || 0).toLocaleString()}`,
-          totalAmount: data.totalAmount || data.amount || 0,
-          products: Array.isArray(data.items) ? data.items.length : 1,
-          items: data.items || [],
-          paymentMethod: 'flutterwave',
-          customerName: data.customerName || data.name,
-          customerEmail: data.customerEmail || data.email,
-          createdAt: data.createdAt,
-          orderDate: data.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
-          transactionId: data.transactionId,
-          reference: data.reference,
-          paymentStatus: data.paymentStatus || 'completed'
-        });
-      });
-      
-      console.log(`📦 Found ${flutterwaveSnapshot.size} Flutterwave orders for user ${userId}`);
-    } catch (error) {
-      console.error('Error fetching Flutterwave orders:', error);
-    }
+      const orders: Order[] = [];
 
-    // 2. Get Bank Transfer orders - FIXED: Use userEmail instead of userId
-    if (userEmail) {
+      // 1. Get Flutterwave orders
       try {
-        const bankTransferQuery = query(
-          collection(db, 'bankTransferOrders'),
-          where('customerEmail', '==', userEmail), // ✅ FIXED: Use userEmail
+        const flutterwaveQuery = query(
+          collection(db, 'orders'),
+          where('userId', '==', userId),
           orderBy('createdAt', 'desc')
         );
         
-        const bankTransferSnapshot = await getDocs(bankTransferQuery);
+        const flutterwaveSnapshot = await getDocs(flutterwaveQuery);
         
-        bankTransferSnapshot.docs.forEach(doc => {
+        flutterwaveSnapshot.docs.forEach(doc => {
           const data = doc.data();
           orders.push({
             id: doc.id,
             orderId: data.orderId || doc.id,
-            status: this.mapBankTransferStatus(data.status),
+            userId: data.userId,
+            status: data.status || 'completed',
             date: data.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
-            total: `₦${(data.amount || 0).toLocaleString()}`,
-            totalAmount: data.amount || 0,
+            total: `₦${(data.totalAmount || data.amount || 0).toLocaleString()}`,
+            totalAmount: data.totalAmount || data.amount || 0,
             products: Array.isArray(data.items) ? data.items.length : 1,
             items: data.items || [],
-            paymentMethod: 'bank_transfer',
-            customerName: data.customerName,
-            customerEmail: data.customerEmail,
-            customerPhone: data.customerPhone,
+            paymentMethod: 'flutterwave',
+            customerName: data.customerName || data.name,
+            customerEmail: data.customerEmail || data.email,
             createdAt: data.createdAt,
             orderDate: data.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
-            bankDetails: data.bankDetails,
-            proofOfPayment: data.proofOfPayment,
-            paymentSubmittedAt: data.paymentSubmittedAt,
-            paymentVerifiedAt: data.paymentVerifiedAt
+            transactionId: data.transactionId,
+            reference: data.reference,
+            paymentStatus: data.paymentStatus || 'completed'
           });
         });
         
-        console.log(`🏦 Found ${bankTransferSnapshot.size} Bank Transfer orders for user ${userEmail}`);
+        console.log(`📦 Found ${flutterwaveSnapshot.size} Flutterwave orders for user ${userId}`);
       } catch (error) {
-        console.error('Error fetching Bank Transfer orders:', error);
+        console.error('Error fetching Flutterwave orders:', error);
       }
-    } else {
-      console.log('⚠️ No user email provided, skipping bank transfer orders');
+
+      // 2. Get Bank Transfer orders - Use userEmail instead of userId
+      if (userEmail) {
+        try {
+          const bankTransferQuery = query(
+            collection(db, 'bankTransferOrders'),
+            where('customerEmail', '==', userEmail),
+            orderBy('createdAt', 'desc')
+          );
+          
+          const bankTransferSnapshot = await getDocs(bankTransferQuery);
+          
+          bankTransferSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            orders.push({
+              id: doc.id,
+              orderId: data.orderId || doc.id,
+              status: this.mapBankTransferStatus(data.status),
+              date: data.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+              total: `₦${(data.amount || 0).toLocaleString()}`,
+              totalAmount: data.amount || 0,
+              products: Array.isArray(data.items) ? data.items.length : 1,
+              items: data.items || [],
+              paymentMethod: 'bank_transfer',
+              customerName: data.customerName,
+              customerEmail: data.customerEmail,
+              customerPhone: data.customerPhone,
+              createdAt: data.createdAt,
+              orderDate: data.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString(),
+              bankDetails: data.bankDetails,
+              proofOfPayment: data.proofOfPayment,
+              paymentSubmittedAt: data.paymentSubmittedAt,
+              paymentVerifiedAt: data.paymentVerifiedAt
+            });
+          });
+          
+          console.log(`🏦 Found ${bankTransferSnapshot.size} Bank Transfer orders for user ${userEmail}`);
+        } catch (error) {
+          console.error('Error fetching Bank Transfer orders:', error);
+        }
+      } else {
+        console.log('⚠️ No user email provided, skipping bank transfer orders');
+      }
+
+      // 3. Sort all orders by creation date (newest first)
+      orders.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(a.date);
+        const dateB = b.createdAt?.toDate?.() || new Date(b.date);
+        return dateB - dateA;
+      });
+
+      console.log(`✅ Total orders found: ${orders.length} (Flutterwave + Bank Transfer)`);
+      return orders;
+      
+    } catch (error) {
+      console.error('Error in getUserOrders:', error);
+      return [];
     }
-
-    // 3. Sort all orders by creation date (newest first)
-    orders.sort((a, b) => {
-      const dateA = a.createdAt?.toDate?.() || new Date(a.date);
-      const dateB = b.createdAt?.toDate?.() || new Date(b.date);
-      return dateB - dateA;
-    });
-
-    console.log(`✅ Total orders found: ${orders.length} (Flutterwave + Bank Transfer)`);
-    return orders;
-    
-  } catch (error) {
-    console.error('Error in getUserOrders:', error);
-    return [];
   }
-}
 
   /**
    * Get order for tracking by order ID from both collections
