@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     siteName: "SymbolStore",
     images: [
       {
-        url: "https://your-domain.com/assets/og-image.jpg", // Hosted on your own site
+        url: "https://blogger.googleusercontent.com/img/a/AVvXsEhrePZeoBlrC8tkcr_N7ds-WmkWYQbkAi3SFg58-AODuUPH04oCGglDYKKKVOu3EU7JAcbhPAjXW63VG8G6vNyCxeklJ7GTF1_XxCHUKWnuwtAY9O-ou0uqgGsW4BcFz1i36k6KhfawwCwL2Wks6C5-4gTHUTIPBKtxqsP3UmwVCJCiZIXIZy1jQdotzJs", // Hosted on your own site
         width: 1200,
         height: 630,
         alt: "SymbolStore Online Shopping Preview",
