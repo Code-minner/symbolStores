@@ -15,13 +15,31 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "SymbolStore - Your Electronics Store",
+  title: "SymbolStore - Premium Electronics & Home Appliances",
   description:
-    "Shop the latest electronics, home appliances, and more at great prices",
+    "Shop the latest electronics, home appliances, and gadgets at unbeatable prices. Fast delivery, secure payments, and top-quality products — all in one store.",
   icons: {
     icon: "/assets/SymbolStoreicon.jpg",
   },
+  openGraph: {
+    title: "SymbolStore - Shop Smart, Live Better",
+    description:
+      "Discover high-quality electronics, home appliances, and accessories at affordable prices. Enjoy fast shipping and secure checkout every time.",
+    url: "https://your-domain.com", // Replace with your actual site URL
+    siteName: "SymbolStore",
+    images: [
+      {
+        url: "https://your-domain.com/assets/og-image.jpg", // Hosted on your own site
+        width: 1200,
+        height: 630,
+        alt: "SymbolStore Online Shopping Preview",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
 };
+
 
 export default function RootLayout({
   children,
