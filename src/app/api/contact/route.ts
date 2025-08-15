@@ -1,8 +1,20 @@
-// app/api/contact/route.ts
-import { Resend } from 'resend';
+// app/api/contact/route.ts - MIGRATED TO ZEPTOMAIL
 import { NextRequest, NextResponse } from 'next/server';
+import nodemailer from 'nodemailer';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Create SMTP transporter - fully configurable through environment variables
+const transporter = nodemailer.createTransport({
+  host: process.env.ZEPTOMAIL_HOST || "smtp.zeptomail.com",
+  port: parseInt(process.env.ZEPTOMAIL_PORT || "465"),
+  secure: process.env.ZEPTOMAIL_PORT === "465" ? true : false, // Auto-detect based on port
+  auth: {
+    user: process.env.ZEPTOMAIL_USER,
+    pass: process.env.ZEPTOMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
+  },
+});
 
 interface ContactFormData {
   firstName: string;
@@ -16,19 +28,20 @@ export async function POST(request: NextRequest) {
   console.log('🚀 Contact API called');
   
   try {
-    // Check if Resend API key exists
-    if (!process.env.RESEND_API_KEY) {
-      console.error('❌ RESEND_API_KEY not found in environment variables');
+    // Check if ZeptoMail credentials exist
+    if (!process.env.ZEPTOMAIL_USER || !process.env.ZEPTOMAIL_PASS) {
+      console.error('❌ ZEPTOMAIL credentials not found in environment variables');
       return NextResponse.json(
         { message: 'Email service not configured' },
         { status: 500 }
       );
     }
     
-    console.log('✅ Resend API key found');
+    console.log('✅ ZeptoMail credentials found');
     console.log('📧 Email config:', {
-      fromEmail: process.env.FROM_EMAIL || 'onboarding@resend.dev',
-      adminEmail: process.env.ADMIN_EMAIL || 'not set'
+      fromEmail: process.env.FROM_EMAIL || 'contact@symbolstores.com',
+      adminEmail: process.env.ADMIN_EMAIL || 'not set',
+      companyName: process.env.COMPANY_NAME || 'Symbol Stores'
     });
 
     const body: ContactFormData = await request.json();
@@ -59,9 +72,9 @@ export async function POST(request: NextRequest) {
 
     // Send notification email to business
     console.log('📧 Attempting to send business notification email...');
-    const businessEmailResult = await resend.emails.send({
-      from: process.env.FROM_EMAIL || 'onboarding@resend.dev', // Use your environment variable
-      to: [process.env.ADMIN_EMAIL || 'contact@symbolstores.com'], // Use your admin email
+    const businessEmailResult = await transporter.sendMail({
+      from: `"${process.env.COMPANY_NAME || 'Symbol Stores'}" <${process.env.FROM_EMAIL || 'contact@symbolstores.com'}>`,
+      to: process.env.ADMIN_EMAIL || 'contact@symbolstores.com',
       subject: `New Contact Form Submission from ${firstName} ${lastName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -94,20 +107,14 @@ export async function POST(request: NextRequest) {
       `,
     });
     
-    // Check if business email actually succeeded
-    if (businessEmailResult.error) {
-      console.error('❌ Business email failed:', businessEmailResult.error);
-      throw new Error(`Business email failed: ${businessEmailResult.error.message || businessEmailResult.error}`);
-    }
-    
-    console.log('✅ Business email sent successfully:', businessEmailResult.data?.id);
+    console.log('✅ Business email sent successfully:', businessEmailResult.messageId);
 
     // Send confirmation email to customer
     console.log('📧 Attempting to send customer confirmation email...');
-    const customerEmailResult = await resend.emails.send({
-      from: process.env.FROM_EMAIL || 'onboarding@resend.dev', // Use your environment variable
-      to: [email], // Send to the actual customer email
-      subject: 'Thank you for contacting Symbolstores',
+    const customerEmailResult = await transporter.sendMail({
+      from: `"${process.env.COMPANY_NAME || 'Symbol Stores'}" <${process.env.FROM_EMAIL || 'contact@symbolstores.com'}>`,
+      to: email, // Send to the actual customer email
+      subject: `Thank you for contacting ${process.env.COMPANY_NAME || 'Symbolstores'}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
@@ -169,20 +176,14 @@ export async function POST(request: NextRequest) {
       `,
     });
     
-    // Check if customer email actually succeeded
-    if (customerEmailResult.error) {
-      console.error('❌ Customer email failed:', customerEmailResult.error);
-      throw new Error(`Customer email failed: ${customerEmailResult.error.message || customerEmailResult.error}`);
-    }
-    
-    console.log('✅ Customer email sent successfully:', customerEmailResult.data?.id);
+    console.log('✅ Customer email sent successfully:', customerEmailResult.messageId);
     console.log('🎉 All emails sent successfully');
 
     return NextResponse.json(
       { 
         message: 'Message sent successfully! We will get back to you within 24 hours.',
-        businessEmailId: businessEmailResult.data?.id,
-        customerEmailId: customerEmailResult.data?.id
+        businessEmailId: businessEmailResult.messageId,
+        customerEmailId: customerEmailResult.messageId
       },
       { status: 200 }
     );
@@ -198,21 +199,21 @@ export async function POST(request: NextRequest) {
     
     // Return different error messages based on error type
     if (error instanceof Error) {
-      if (error.message.includes('API key')) {
-        console.error('🔑 API key error');
+      if (error.message.includes('auth') || error.message.includes('credential')) {
+        console.error('🔑 Authentication error');
         return NextResponse.json(
-          { message: 'Email service configuration error' },
+          { message: 'Email service authentication error' },
           { status: 500 }
         );
       }
-      if (error.message.includes('domain') || error.message.includes('verification')) {
-        console.error('🌐 Domain verification error');
+      if (error.message.includes('SMTP') || error.message.includes('connection')) {
+        console.error('🌐 SMTP connection error');
         return NextResponse.json(
-          { message: 'Email domain not verified' },
+          { message: 'Email service connection error' },
           { status: 500 }
         );
       }
-      if (error.message.includes('rate limit')) {
+      if (error.message.includes('rate limit') || error.message.includes('quota')) {
         console.error('⏰ Rate limit error');
         return NextResponse.json(
           { message: 'Too many requests. Please try again later.' },

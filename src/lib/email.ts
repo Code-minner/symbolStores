@@ -1,8 +1,19 @@
-// src/lib/email.ts - PROFESSIONAL GRAY THEME VERSION
-import { Resend } from "resend";
+// src/lib/email.ts - MIGRATED TO ZEPTOMAIL WITH NODEMAILER (WORKING VERSION)
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-export { resend };
+// Create SMTP transporter - fully configurable through environment variables
+const transporter = nodemailer.createTransport({
+  host: process.env.ZEPTOMAIL_HOST || "smtp.zeptomail.com",
+  port: parseInt(process.env.ZEPTOMAIL_PORT || "465"),
+  secure: process.env.ZEPTOMAIL_PORT === "465" ? true : false, // Auto-detect based on port
+  auth: {
+    user: process.env.ZEPTOMAIL_USER,
+    pass: process.env.ZEPTOMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
+  },
+});
 
 // Import the same constants from CartContext to ensure consistency
 const FREE_SHIPPING_THRESHOLD = 990000.0; // ₦990,000.00
@@ -14,10 +25,10 @@ const roundUpToNearest10 = (price: number): number => {
   return Math.ceil(price / 10) * 10;
 };
 
-// Company branding - Modern professional styling
-const COMPANY_LOGO_URL = "https://blogger.googleusercontent.com/img/a/AVvXsEgK1twSSTpBfb733eXn3ufZ_gpU17vzZ0v25saCwUZRlrXQT3ceONzwo06auDlfUJt_7cEXDPIS-4IJLufMCFsEjDT_OcH5jHCXjUGA5b3iEAmQRL11hF_kPekeJOGvW0PYBnozZoTRdQtB5VHyvz4zbsXU3s1KK2MjnUuE3n-B2TtIiSSPwDSwJ4vL0HM";
-const COMPANY_NAME = "Symbol Stores";
-const FALLBACK_LOGO = "SS";
+// Company branding - fully configurable through environment variables
+const COMPANY_LOGO_URL = process.env.COMPANY_LOGO_URL || "https://blogger.googleusercontent.com/img/a/AVvXsEgK1twSSTpBfb733eXn3ufZ_gpU17vzZ0v25saCwUZRlrXQT3ceONzwo06auDlfUJt_7cEXDPIS-4IJLufMCFsEjDT_OcH5jHCXjUGA5b3iEAmQRL11hF_kPekeJOGvW0PYBnozZoTRdQtB5VHyvz4zbsXU3s1KK2MjnUuE3n-B2TtIiSSPwDSwJ4vL0HM";
+const COMPANY_NAME = process.env.COMPANY_NAME || "Symbol Stores";
+const FALLBACK_LOGO = COMPANY_NAME.split(' ').map(word => word[0]).join('').toUpperCase() || "SS";
 
 interface OrderItemForEmail {
   itemName: string;
@@ -172,15 +183,6 @@ const ensureCalculatedTotalsForEmail = (
   }
   return calculateEmailTotals(orderData.items, orderData.totalAmountItemsOnly);
 };
-
-// Professional email headers for anti-spam
-const getEmailHeaders = (orderId: string, priority: string = "3") => ({
-  "X-Entity-Ref-ID": orderId,
-  "X-Priority": priority,
-  "List-Unsubscribe": `<mailto:unsubscribe@symbolstores.com>`,
-  "X-Auto-Response-Suppress": "OOF",
-  Precedence: "bulk",
-});
 
 // ✅ UPDATED: Professional Modern Gray Theme Styling
 const getProfessionalEmailStyles = () => `
@@ -483,12 +485,11 @@ const getProfessionalEmailStyles = () => `
     .step-number { 
       width: 40px; 
       height: 40px; 
-      background: linear-gradient(135deg, #64748b, #475569); 
       border-radius: 50%; 
       display: flex; 
       align-items: center; 
       justify-content: center; 
-      color: white; 
+      color: black; 
       font-weight: bold; 
       font-size: 18px; 
       flex-shrink: 0; 
@@ -618,34 +619,28 @@ const getProfessionalEmailStyles = () => `
 `;
 
 export class EmailService {
-  // Helper method to send emails with error handling
+  // Helper method to send emails with nodemailer (fully configurable)
   private static async sendEmail(params: {
     to: string;
     subject: string;
     html: string;
-    text: string;
-    headers?: any;
-    tags?: Array<{ name: string; value: string }>;
+    text?: string;
   }) {
     try {
-      const { data, error } = await resend.emails.send({
-        from: `Symbol Stores <${process.env.FROM_EMAIL || "orders@symbolstores.com"}>`,
-        to: [params.to],
+      console.log(`📧 Attempting to send email to: ${params.to}`);
+
+      const info = await transporter.sendMail({
+        from: `"${COMPANY_NAME}" <${process.env.FROM_EMAIL || 'noreply@symbolstores.com'}>`,
+        to: params.to,
         subject: params.subject,
         html: params.html,
-        text: params.text,
-        headers: params.headers,
-        tags: params.tags,
+        text: params.text || params.subject, // Fallback to subject if no text provided
       });
 
-      if (error) {
-        console.error("Email send error:", error);
-        return { success: false, error: error.message || String(error) };
-      }
-
-      return { success: true, data };
+      console.log("✅ Email sent successfully:", info.messageId);
+      return { success: true, data: info };
     } catch (error) {
-      console.error("Email service error:", error);
+      console.error("❌ Email send error:", error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -791,12 +786,6 @@ export class EmailService {
         subject: `Payment Issue - Order ${data.orderId}`,
         html: emailHtml,
         text: emailText,
-        headers: getEmailHeaders(data.orderId, "2"),
-        tags: [
-          { name: "type", value: "payment-failed" },
-          { name: "order-id", value: data.orderId },
-          { name: "amount", value: Math.round(data.amount).toString() },
-        ],
       });
 
       if (result.success) {
@@ -816,10 +805,10 @@ export class EmailService {
     }
   }
 
-  // ✅ UPDATED: Bank transfer instructions with modern gray theme
+  // ✅ UPDATED: Bank transfer instructions with nodemailer
   static async sendBankTransferInstructions(data: BankTransferInstructionsData) {
     try {
-      console.log("Sending professional bank transfer instructions email to:", data.customerEmail);
+      console.log("📧 Sending bank transfer instructions email to:", data.customerEmail);
 
       const totals = ensureCalculatedTotalsForEmail(data);
 
@@ -943,65 +932,30 @@ export class EmailService {
         </body>
         </html>`;
 
-      const plainText = `
-        SYMBOL STORES - PAYMENT INSTRUCTIONS
-        ====================================
-
-        Order: ${data.orderId}
-        Customer: ${data.customerName}
-
-        BANK TRANSFER DETAILS:
-        Bank: ${data.bankDetails.bankName}
-        Account: ${data.bankDetails.accountNumber}
-        Name: ${data.bankDetails.accountName}
-        Amount: ₦${totals.finalTotal.toLocaleString()}
-
-        INSTRUCTIONS:
-        1. Transfer exactly ₦${totals.finalTotal.toLocaleString()}
-        2. Use "${data.orderId}" as description
-        3. Save transaction reference
-        4. Submit reference at: ${process.env.NEXT_PUBLIC_APP_URL}/order-success?orderId=${data.orderId}
-
-        ORDER SUMMARY:
-        Subtotal: ₦${totals.totalAmountItemsOnly.toLocaleString()}
-        Shipping: ${totals.isFreeShipping ? "FREE" : "₦" + totals.shippingCost.toLocaleString()}
-        Tax: ₦${totals.taxAmount.toLocaleString()}
-        Total: ₦${totals.finalTotal.toLocaleString()}
-
-        Questions? Contact: symbolstores45@gmail.com
-      `;
-
       const result = await this.sendEmail({
         to: data.customerEmail,
         subject: `Payment Instructions - Order ${data.orderId} (₦${totals.finalTotal.toLocaleString()})`,
         html,
-        text: plainText,
-        headers: getEmailHeaders(data.orderId, "2"),
-        tags: [
-          { name: "type", value: "payment-instructions" },
-          { name: "order-id", value: data.orderId },
-          { name: "amount", value: Math.round(totals.finalTotal).toString() },
-        ],
       });
 
       if (result.success) {
-        console.log("Professional bank transfer instructions email sent successfully");
+        console.log("✅ Bank transfer instructions email sent successfully");
       } else {
-        console.error("Failed to send bank transfer instructions:", result.error);
+        console.error("❌ Failed to send bank transfer instructions:", result.error);
       }
 
       return { success: result.success, data: result.data, error: result.error };
     } catch (error) {
-      console.error("Failed to send bank transfer instructions:", error);
+      console.error("❌ Failed to send bank transfer instructions:", error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
-  // ✅ UPDATED: Admin notification with modern gray theme
+  // ✅ UPDATED: Admin notification with nodemailer
   static async sendAdminNotification(orderData: OrderData) {
     try {
       const totals = ensureCalculatedTotalsForEmail(orderData);
-      console.log("Sending professional admin notification for order:", orderData.orderId);
+      console.log("📧 Sending admin notification for order:", orderData.orderId);
 
       const itemsHtml = orderData.items
         .map((item) => {
@@ -1132,63 +1086,30 @@ export class EmailService {
         </body>
         </html>`;
 
-      const plainText = `
-        SYMBOL STORES - NEW ORDER ALERT
-        ===============================
-
-        Order: ${orderData.orderId}
-        Value: ₦${totals.finalTotal.toLocaleString()}
-        Status: ${isBankTransfer ? "Awaiting Payment" : "Payment Confirmed"}
-
-        CUSTOMER:
-        Name: ${orderData.customerName}
-        Email: ${orderData.customerEmail}
-        Phone: ${orderData.customerPhone || "Not provided"}
-        Payment: ${isBankTransfer ? "Bank Transfer" : "Flutterwave"}
-
-        ORDER BREAKDOWN:
-        Subtotal: ₦${totals.totalAmountItemsOnly.toLocaleString()}
-        Shipping: ${totals.isFreeShipping ? "FREE" : "₦" + totals.shippingCost.toLocaleString()}
-        Tax: ₦${totals.taxAmount.toLocaleString()}
-        Total: ₦${totals.finalTotal.toLocaleString()}
-
-        View Details: ${process.env.NEXT_PUBLIC_APP_URL}/admin/orders/${orderData.orderId}
-
-        ${orderData.orderNotes ? `Notes: "${orderData.orderNotes}"` : ''}
-      `;
-
       const result = await this.sendEmail({
         to: process.env.ADMIN_EMAIL || "admin@symbolstores.com",
         subject: `New Order ${orderData.orderId} - ₦${totals.finalTotal.toLocaleString()} - ${orderData.customerName}`,
         html,
-        text: plainText,
-        headers: getEmailHeaders(orderData.orderId, "1"),
-        tags: [
-          { name: "type", value: "admin-notification" },
-          { name: "payment-method", value: isBankTransfer ? "bank-transfer" : "flutterwave" },
-          { name: "amount", value: Math.round(totals.finalTotal).toString() },
-          { name: "priority", value: "high" },
-        ],
       });
 
       if (result.success) {
-        console.log("Professional admin notification email sent successfully");
+        console.log("✅ Admin notification email sent successfully");
       } else {
-        console.error("Failed to send admin notification email:", result.error);
+        console.error("❌ Failed to send admin notification email:", result.error);
       }
 
       return { success: result.success, error: result.error };
     } catch (error) {
-      console.error("Admin email service error:", error);
+      console.error("❌ Admin email service error:", error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
-  // ✅ UPDATED: Bank transfer confirmation with modern gray theme
+  // ✅ UPDATED: Bank transfer confirmation with nodemailer
   static async sendBankTransferConfirmation(orderData: OrderData) {
     try {
       const totals = ensureCalculatedTotalsForEmail(orderData);
-      console.log("Sending professional bank transfer confirmation email");
+      console.log("📧 Sending bank transfer confirmation email");
 
       const itemsHtml = orderData.items
         .map((item) => {
@@ -1215,15 +1136,6 @@ export class EmailService {
             </tr>`;
         })
         .join("");
-
-      const itemsList = orderData.items
-        .map((item) => {
-          const itemPrice = typeof item.amount === "number" && !isNaN(item.amount) ? item.amount : 0;
-          const itemQuantity = typeof item.quantity === "number" && !isNaN(item.quantity) ? item.quantity : 1;
-          const itemTotal = itemPrice * itemQuantity;
-          return `${item.itemName} (Qty: ${itemQuantity}) - ₦${itemTotal.toLocaleString()}`;
-        })
-        .join("\n");
 
       const html = `
         <!DOCTYPE html>
@@ -1343,73 +1255,30 @@ export class EmailService {
         </body>
         </html>`;
 
-      const plainText = `
-        SYMBOL STORES - PAYMENT VERIFIED
-        ================================
-
-        Thank you ${orderData.customerName}!
-
-        Your bank transfer has been verified and your order is confirmed.
-
-        ORDER DETAILS:
-        Order ID: ${orderData.orderId}
-        Payment: Bank Transfer ✅
-        Date: ${new Date().toLocaleDateString('en-NG')}
-
-        PAYMENT SUMMARY:
-        Subtotal: ₦${totals.totalAmountItemsOnly.toLocaleString()}
-        Shipping: ${totals.isFreeShipping ? "FREE" : "₦" + totals.shippingCost.toLocaleString()}
-        Tax: ₦${totals.taxAmount.toLocaleString()}
-        Total Paid: ₦${totals.finalTotal.toLocaleString()}
-
-        ITEMS ORDERED:
-        ${itemsList}
-
-        WHAT'S NEXT:
-        1. Order Processing - We're preparing your items
-        2. Shipping Notification - You'll get tracking details
-        3. Delivery - Estimated 3-5 business days
-
-        Track Order: ${process.env.NEXT_PUBLIC_APP_URL}/orders/${orderData.orderId}
-
-        SUPPORT:
-        Email: symbolstores45@gmail.com
-        WhatsApp: +234 812 345 6789
-        Hours: Mon-Sat, 9AM-6PM (WAT)
-      `;
-
       const result = await this.sendEmail({
         to: orderData.customerEmail,
         subject: `Payment Verified - Order ${orderData.orderId} (₦${totals.finalTotal.toLocaleString()})`,
         html,
-        text: plainText,
-        headers: getEmailHeaders(orderData.orderId, "2"),
-        tags: [
-          { name: "type", value: "payment-verified" },
-          { name: "order-id", value: orderData.orderId },
-          { name: "amount", value: Math.round(totals.finalTotal).toString() },
-          { name: "status", value: "confirmed" },
-        ],
       });
 
       if (result.success) {
-        console.log("Professional bank transfer confirmation email sent successfully");
+        console.log("✅ Bank transfer confirmation email sent successfully");
       } else {
-        console.error("Failed to send bank transfer confirmation email:", result.error);
+        console.error("❌ Failed to send bank transfer confirmation email:", result.error);
       }
 
       return { success: result.success, data: result.data, error: result.error };
     } catch (error) {
-      console.error("Bank transfer confirmation email service error:", error);
+      console.error("❌ Bank transfer confirmation email service error:", error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
-  // ✅ UPDATED: Regular order confirmation with modern gray theme
+  // ✅ UPDATED: Regular order confirmation with nodemailer
   static async sendOrderConfirmation(orderData: OrderData) {
     try {
       const totals = ensureCalculatedTotalsForEmail(orderData);
-      console.log("Sending professional order confirmation email to:", orderData.customerEmail);
+      console.log("📧 Sending order confirmation email to:", orderData.customerEmail);
 
       const itemsHtml = orderData.items
         .map((item) => {
@@ -1436,15 +1305,6 @@ export class EmailService {
             </tr>`;
         })
         .join("");
-
-      const itemsList = orderData.items
-        .map((item) => {
-          const itemPrice = typeof item.amount === "number" && !isNaN(item.amount) ? item.amount : 0;
-          const itemQuantity = typeof item.quantity === "number" && !isNaN(item.quantity) ? item.quantity : 1;
-          const itemTotal = itemPrice * itemQuantity;
-          return `${item.itemName} (Qty: ${itemQuantity}) - ₦${itemTotal.toLocaleString()}`;
-        })
-        .join("\n");
 
       const paymentMethod = orderData.bankDetails ? "Bank Transfer" : "Flutterwave";
 
@@ -1567,64 +1427,21 @@ export class EmailService {
         </body>
         </html>`;
 
-      const plainText = `
-        SYMBOL STORES - ORDER CONFIRMED
-        ===============================
-
-        Thank you ${orderData.customerName}!
-
-        Your payment has been received and your order is being processed.
-
-        ORDER DETAILS:
-        Order ID: ${orderData.orderId}
-        Payment: ${paymentMethod} ✅
-        Date: ${new Date().toLocaleDateString('en-NG')}
-
-        PAYMENT SUMMARY:
-        Subtotal: ₦${totals.totalAmountItemsOnly.toLocaleString()}
-        Shipping: ${totals.isFreeShipping ? "FREE" : "₦" + totals.shippingCost.toLocaleString()}
-        Tax: ₦${totals.taxAmount.toLocaleString()}
-        Total Paid: ₦${totals.finalTotal.toLocaleString()}
-
-        ITEMS ORDERED:
-        ${itemsList}
-
-        WHAT'S NEXT:
-        1. Order Processing - We're preparing your items
-        2. Shipping Notification - You'll get tracking details  
-        3. Delivery - Estimated 3-5 business days
-
-        Track Order: ${process.env.NEXT_PUBLIC_APP_URL}/orders/${orderData.orderId}
-
-        SUPPORT:
-        Email: symbolstores45@gmail.com
-        WhatsApp: +234 812 345 6789
-        Hours: Mon-Sat, 9AM-6PM (WAT)
-      `;
-
       const result = await this.sendEmail({
         to: orderData.customerEmail,
         subject: `Order Confirmed ${orderData.orderId} - ₦${totals.finalTotal.toLocaleString()}`,
         html,
-        text: plainText,
-        headers: getEmailHeaders(orderData.orderId, "2"),
-        tags: [
-          { name: "type", value: "order-confirmation" },
-          { name: "payment-method", value: orderData.bankDetails ? "bank-transfer" : "flutterwave" },
-          { name: "amount", value: Math.round(totals.finalTotal).toString() },
-          { name: "status", value: "confirmed" },
-        ],
       });
 
       if (result.success) {
-        console.log("Professional order confirmation email sent successfully");
+        console.log("✅ Order confirmation email sent successfully");
       } else {
-        console.error("Failed to send order confirmation email:", result.error);
+        console.error("❌ Failed to send order confirmation email:", result.error);
       }
 
       return { success: result.success, data: result.data, error: result.error };
     } catch (error) {
-      console.error("Email service error:", error);
+      console.error("❌ Email service error:", error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

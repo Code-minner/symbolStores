@@ -1,7 +1,22 @@
-// src/app/api/payments/bank-transfer/verify-reference/route.ts
+// src/app/api/payments/bank-transfer/verify-reference/route.ts - MIGRATED TO ZEPTOMAIL
 import { NextRequest, NextResponse } from 'next/server';
 import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import nodemailer from 'nodemailer';
+
+// Create SMTP transporter - fully configurable through environment variables
+const transporter = nodemailer.createTransport({
+  host: process.env.ZEPTOMAIL_HOST || "smtp.zeptomail.com",
+  port: parseInt(process.env.ZEPTOMAIL_PORT || "465"),
+  secure: process.env.ZEPTOMAIL_PORT === "465" ? true : false, // Auto-detect based on port
+  auth: {
+    user: process.env.ZEPTOMAIL_USER,
+    pass: process.env.ZEPTOMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
+  },
+});
 
 // Import the same constants for consistency
 const FREE_SHIPPING_THRESHOLD = 990000.00; // ₦990,000.00
@@ -163,7 +178,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ KEEP EMAIL DESIGN UNCHANGED - Anti-spam admin notification with proper totals
+// ✅ UPDATED: Anti-spam admin notification with ZeptoMail
 async function sendAdminNotification(data: {
   orderId: string;
   customerName: string;
@@ -174,7 +189,7 @@ async function sendAdminNotification(data: {
   orderData: any; // Full order data for breakdown
 }) {
   try {
-    const { resend } = await import('@/lib/email');
+    console.log('📧 Attempting to send admin payment verification notification...');
     
     // Calculate if there's a discrepancy
     const hasDiscrepancy = Math.abs(data.expectedAmount - data.submittedAmount) > 1; // Allow for small rounding
@@ -301,31 +316,19 @@ Admin Link: ${process.env.NEXT_PUBLIC_APP_URL}/admin/orders/${data.orderId}
 Target Response Time: 2-4 hours
     `;
 
-    const result = await resend.emails.send({
+    // ✅ UPDATED: Use nodemailer with ZeptoMail instead of Resend
+    const result = await transporter.sendMail({
       // ✅ ANTI-SPAM: Use proper from address
-      from: `Symbol Stores System <${process.env.FROM_EMAIL || 'notifications@symbolstores.com'}>`,
-      to: [process.env.ADMIN_EMAIL || 'admin@symbolstores.com'],
+      from: `"${process.env.COMPANY_NAME || 'Symbol Stores'} System" <${process.env.FROM_EMAIL || 'notifications@symbolstores.com'}>`,
+      to: process.env.ADMIN_EMAIL || 'admin@symbolstores.com',
       // ✅ ANTI-SPAM: More transactional subject
       subject: `Payment Verification Required - Order ${data.orderId} - ₦${data.expectedAmount.toLocaleString()}`,
       html,
       // ✅ ANTI-SPAM: Include plain text version
       text: plainText,
-      // ✅ ANTI-SPAM: Proper headers
-      headers: {
-        "X-Entity-Ref-ID": data.orderId,
-        "X-Priority": "2", // Normal priority, not urgent
-        "List-Unsubscribe": `<mailto:unsubscribe@symbolstores.com>`,
-        "X-Auto-Response-Suppress": "OOF", // Suppress auto-responses
-      },
-      // ✅ ANTI-SPAM: Proper categorization
-      tags: [
-        { name: "type", value: "payment-verification" },
-        { name: "order-id", value: data.orderId },
-        { name: "automated", value: "true" },
-      ],
     });
 
-    console.log('✅ Admin notification sent successfully:', result);
+    console.log('✅ Admin payment verification notification sent successfully:', result.messageId);
     
   } catch (error) {
     console.error('❌ Failed to send admin notification:', error);
