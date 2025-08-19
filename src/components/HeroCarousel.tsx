@@ -101,7 +101,7 @@ const HeroCarousel = () => {
                     <div className="w-full h-full flex justify-between items-center px-1">
                       <div className="w-full max-w-[100%] sm:max-w-[100%] lg:max-w-[90%] bg-gray-100 rounded-[20px] shadow-lg overflow-hidden mb-8 py-16  flex flex-col relative">
                         {/* Image Section - ✅ FIXED: Better image positioning */}
-                        <div className="relative w-full h-[180px] sm:h-[220px] lg:h-[260px] bg-gray-100 overflow-hidden flex items-center justify-center">
+                        <div className="relative w-full h-[160px] sm:h-[200px] lg:h-[220px] bg-gray-100 overflow-hidden flex items-center justify-center">
                           <Image
                             src={slide.image}
                             alt={slide.alt}

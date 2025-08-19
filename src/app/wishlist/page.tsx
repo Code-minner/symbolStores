@@ -258,7 +258,7 @@ export default function WishlistPage() {
     <div>
       <Header />
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-[1400px] mx-auto px-4">
+        <div className="max-w-[1200px] mx-auto px-4">
           {syncStatus === "syncing" && (
             <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-md mb-4 text-sm">
               <div className="flex items-center gap-2">
@@ -456,7 +456,7 @@ export default function WishlistPage() {
                       <Image
                         src={item.imageURL}
                         alt={item.itemName}
-                        className="w-full h-[180px] sm:h-[220px] "
+                        className="w-full h-[140px] sm:h-[150px]"
                         fill
                         style={{
                           objectFit: "cover",
@@ -466,54 +466,7 @@ export default function WishlistPage() {
                     </div>
                   </Link>
 
-                  <button
-                    onClick={async () => await removeFromWishlist(item.id)}
-                    style={{
-                      position: "absolute",
-                      top: "10px",
-                      right: "10px",
-                      backgroundColor: "rgba(255, 255, 255, 0.7)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "50%",
-                      width: "28px",
-                      height: "28px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      fontSize: "18px",
-                      fontWeight: "bold",
-                      transition: "all 0.2s ease",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor =
-                        "rgba(255, 255, 255, 0.8)";
-                      e.currentTarget.style.transform = "scale(1.1)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor =
-                        "rgba(255, 255, 255, 0.7)";
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
-                    title="Remove from wishlist"
-                  >
-                    <svg
-                      width="18"
-                      height="20"
-                      viewBox="0 0 18 20"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M17 3.71322H2.33333L3.66667 18.3167H14.3333L15.6667 3.71322H1M9 7.36409V14.6658M12.3333 7.36409L11.6667 14.6658M5.66667 7.36409L6.33333 14.6658M6.33333 3.71322L7 1.2793H11L11.6667 3.71322"
-                        stroke="#1E1E1E"
-                        strokeWidth="1.56"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
+                 
 
                   {(!item.inStock ||
                     (item.originalPrice &&
@@ -660,7 +613,7 @@ export default function WishlistPage() {
                             handleQuantityChange(item.id, "decrease")
                           }
                           disabled={(quantities[item.id] || 1) <= 1}
-                  className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
+                          className="text-[8px] sm:text-[14px] py-[2px] px-[4px]  sm:py-[2.5px] sm:px-[5px]  "
                           style={{
                             fontSize: "1.125rem",
                             fontWeight: "bold",

@@ -29,7 +29,7 @@ export default function ProductSlider({ products }: { products: Product[] }) {
 
   return (
     <section className="w-full py-4 pb-16">
-      <div className="max-w-[1400px] mx-auto px-4">
+      <div className="max-w-[1200px] mx-auto px-4">
         <div className="flex justify-between items-center mt-16 mb-6">
           <h2 className="text-[16px] sm:text-[22px] font-meduim text-gray-800 relative">
             Related Products

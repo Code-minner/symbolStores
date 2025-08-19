@@ -109,7 +109,7 @@ export default function Home() {
     <div className="w-full">
       <Header />
       {/* ✅ FIXED: Proper centering without mr-16 */}
-      <div className="max-w-[1400px] mx-auto px-4 py-8">
+      <div className="max-w-[1200px] mx-auto px-4 py-8">
         <div className="w-full overflow-hidden relative">
           {/* Heading */}
           <div>

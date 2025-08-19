@@ -5,7 +5,15 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { deleteDoc, doc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
+import {
+  deleteDoc,
+  doc,
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -60,7 +68,7 @@ interface PendingOrder {
 export default function AdminDashboard() {
   const { user, userData, loading: authLoading } = useAuth();
   const router = useRouter();
-  
+
   // Product states
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +79,9 @@ export default function AdminDashboard() {
   // Payment verification states
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  const [processingOrderId, setProcessingOrderId] = useState<string | null>(
+    null
+  );
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   // Check admin access
@@ -117,28 +127,31 @@ export default function AdminDashboard() {
   const loadPendingOrders = async () => {
     try {
       setPaymentLoading(true);
-      
+
       const ordersQuery = query(
-        collection(db, 'bankTransferOrders'),
-        where('status', 'in', ['pending_verification', 'pending_manual'])
+        collection(db, "bankTransferOrders"),
+        where("status", "in", ["pending_verification", "pending_manual"])
       );
-      
+
       const ordersSnapshot = await getDocs(ordersQuery);
       const orders: PendingOrder[] = [];
-      
+
       ordersSnapshot.forEach((doc) => {
         const data = doc.data();
         if (data.transactionReference && !data.paymentVerified) {
           orders.push({
             id: doc.id,
             orderId: data.orderId,
-            customerName: data.customerName || 'N/A',
-            customerEmail: data.customerEmail || 'N/A',
+            customerName: data.customerName || "N/A",
+            customerEmail: data.customerEmail || "N/A",
             customerPhone: data.customerPhone,
             amount: data.amount || 0,
             items: data.items || [],
             transactionReference: data.transactionReference,
-            referenceSubmittedAt: data.referenceSubmittedAt || data.updatedAt || new Date().toISOString(),
+            referenceSubmittedAt:
+              data.referenceSubmittedAt ||
+              data.updatedAt ||
+              new Date().toISOString(),
             bankDetails: data.bankDetails,
             status: data.status,
             // Additional fields for proper email totals
@@ -146,18 +159,22 @@ export default function AdminDashboard() {
             shippingCost: data.shippingCost,
             taxAmount: data.taxAmount,
             finalTotal: data.finalTotal || data.amount,
-            isFreeShipping: data.isFreeShipping
+            isFreeShipping: data.isFreeShipping,
           });
         }
       });
-      
+
       // Sort by submission time (newest first)
-      orders.sort((a, b) => new Date(b.referenceSubmittedAt).getTime() - new Date(a.referenceSubmittedAt).getTime());
-      
+      orders.sort(
+        (a, b) =>
+          new Date(b.referenceSubmittedAt).getTime() -
+          new Date(a.referenceSubmittedAt).getTime()
+      );
+
       setPendingOrders(orders);
       console.log(`Loaded ${orders.length} pending orders`);
     } catch (error) {
-      console.error('Error loading pending orders:', error);
+      console.error("Error loading pending orders:", error);
       setPendingOrders([]);
     } finally {
       setPaymentLoading(false);
@@ -165,12 +182,15 @@ export default function AdminDashboard() {
   };
 
   // ✅ FIXED: Send customer notification via API route
-  const sendCustomerNotification = async (order: PendingOrder, action: 'approve' | 'reject') => {
+  const sendCustomerNotification = async (
+    order: PendingOrder,
+    action: "approve" | "reject"
+  ) => {
     try {
-      const response = await fetch('/api/admin/notify-customer', {
-        method: 'POST',
+      const response = await fetch("/api/admin/notify-customer", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           action,
@@ -186,20 +206,19 @@ export default function AdminDashboard() {
             shippingCost: order.shippingCost,
             taxAmount: order.taxAmount,
             finalTotal: order.finalTotal,
-            isFreeShipping: order.isFreeShipping
-          }
-        })
+            isFreeShipping: order.isFreeShipping,
+          },
+        }),
       });
 
       const result = await response.json();
-      
+
       if (!result.success) {
-        throw new Error(result.error || 'Failed to send notification');
+        throw new Error(result.error || "Failed to send notification");
       }
 
       console.log(`✅ ${action} notification sent successfully`);
       return { success: true };
-
     } catch (error) {
       console.error(`❌ Failed to send ${action} notification:`, error);
       return { success: false, error };
@@ -207,44 +226,55 @@ export default function AdminDashboard() {
   };
 
   // ✅ FIXED: Verify payment using API for notifications
-  const handleVerifyPayment = async (orderId: string, action: 'approve' | 'reject') => {
+  const handleVerifyPayment = async (
+    orderId: string,
+    action: "approve" | "reject"
+  ) => {
     if (processingOrderId) return;
-    
-    if (!window.confirm(`Are you sure you want to ${action.toUpperCase()} payment for order ${orderId}?`)) return;
-    
+
+    if (
+      !window.confirm(
+        `Are you sure you want to ${action.toUpperCase()} payment for order ${orderId}?`
+      )
+    )
+      return;
+
     setProcessingOrderId(orderId);
-    
+
     try {
-      const order = pendingOrders.find(o => o.orderId === orderId);
-      if (!order) throw new Error('Order not found');
-      
+      const order = pendingOrders.find((o) => o.orderId === orderId);
+      if (!order) throw new Error("Order not found");
+
       // 1. Update order in Firestore
-      await updateDoc(doc(db, 'bankTransferOrders', order.id), {
-        paymentVerified: action === 'approve',
-        status: action === 'approve' ? 'confirmed' : 'rejected',
-        verificationMethod: 'manual_admin',
+      await updateDoc(doc(db, "bankTransferOrders", order.id), {
+        paymentVerified: action === "approve",
+        status: action === "approve" ? "confirmed" : "rejected",
+        verificationMethod: "manual_admin",
         verifiedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
 
       console.log(`✅ Order ${action}d in Firestore`);
-      
+
       // 2. Send notification email via API route
-      if (action === 'approve') {
+      if (action === "approve") {
         const emailResult = await sendCustomerNotification(order, action);
         if (!emailResult.success) {
-          console.warn('⚠️ Order updated but email notification failed:', emailResult.error);
+          console.warn(
+            "⚠️ Order updated but email notification failed:",
+            emailResult.error
+          );
           // Don't fail the whole operation if email fails
         }
       }
-      
+
       // 3. Remove from pending list
-      setPendingOrders(prev => prev.filter(o => o.orderId !== orderId));
-      
+      setPendingOrders((prev) => prev.filter((o) => o.orderId !== orderId));
+
       // 4. Show success message
-      const emailStatus = action === 'approve' ? ' Customer has been notified via email.' : '';
+      const emailStatus =
+        action === "approve" ? " Customer has been notified via email." : "";
       alert(`Payment ${action}d successfully!${emailStatus}`);
-      
     } catch (error) {
       console.error(`Error ${action}ing payment:`, error);
       alert(`Failed to ${action} payment. Please try again.`);
@@ -255,7 +285,7 @@ export default function AdminDashboard() {
 
   // Toggle order expansion
   const toggleOrderExpansion = (orderId: string) => {
-    setExpandedOrders(prev => {
+    setExpandedOrders((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(orderId)) {
         newSet.delete(orderId);
@@ -270,14 +300,16 @@ export default function AdminDashboard() {
   const formatTimeAgo = (timestamp: string) => {
     const now = new Date();
     const submitted = new Date(timestamp);
-    const diffHours = Math.floor((now.getTime() - submitted.getTime()) / (1000 * 60 * 60));
-    
+    const diffHours = Math.floor(
+      (now.getTime() - submitted.getTime()) / (1000 * 60 * 60)
+    );
+
     if (diffHours >= 24) {
       return `${Math.floor(diffHours / 24)} days ago`;
     } else if (diffHours >= 1) {
       return `${diffHours} hours ago`;
     } else {
-      return 'Just now';
+      return "Just now";
     }
   };
 
@@ -286,24 +318,29 @@ export default function AdminDashboard() {
     const now = new Date();
     const submitted = new Date(timestamp);
     const diffHours = (now.getTime() - submitted.getTime()) / (1000 * 60 * 60);
-    
-    if (diffHours >= 8) return 'border-red-500 bg-red-50';
-    if (diffHours >= 2) return 'border-yellow-500 bg-yellow-50';
-    return 'border-green-500 bg-green-50';
+
+    if (diffHours >= 8) return "border-red-500 bg-red-50";
+    if (diffHours >= 2) return "border-yellow-500 bg-yellow-50";
+    return "border-green-500 bg-green-50";
   };
 
   // 🆕 UPDATED: Delete product with comprehensive cache clearing
-  const handleDeleteProduct = async (productId: string, productName: string) => {
+  const handleDeleteProduct = async (
+    productId: string,
+    productName: string
+  ) => {
     if (!confirm(`Delete "${productName}"?`)) return;
-    
+
     try {
       await deleteDoc(doc(db, "products", productId));
-      
+
       // 🆕 NEW: Use comprehensive cache clearing
       await clearAllProductCaches();
-      
+
       await loadProducts();
-      alert("✅ Product deleted!\n\n🔄 Cache cleared - changes will appear on storefront within 10-15 seconds.");
+      alert(
+        "✅ Product deleted!\n\n🔄 Cache cleared - changes will appear on storefront within 10-15 seconds."
+      );
     } catch (error) {
       console.error("Error deleting product:", error);
       alert("Error deleting product.");
@@ -329,24 +366,30 @@ export default function AdminDashboard() {
   const handleRefresh = async () => {
     // 🆕 NEW: Use comprehensive cache clearing
     await clearAllProductCaches();
-    
+
     await Promise.all([loadProducts(), loadPendingOrders()]);
   };
 
   // 🆕 NEW: Manual cache clear function
   const handleManualCacheClear = async () => {
-    if (confirm('🔄 Clear all product caches?\n\nThis will force fresh data on the next page load.')) {
+    if (
+      confirm(
+        "🔄 Clear all product caches?\n\nThis will force fresh data on the next page load."
+      )
+    ) {
       await clearAllProductCaches();
-      alert('✅ Caches cleared!\n\nFresh data will load on next page visit.');
+      alert("✅ Caches cleared!\n\nFresh data will load on next page visit.");
     }
   };
 
   // Filter products
   const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !filterCategory || product.category === filterCategory;
+    const matchesSearch =
+      product.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      !filterCategory || product.category === filterCategory;
     const matchesStatus = !filterStatus || product.status === filterStatus;
     return matchesSearch && matchesCategory && matchesStatus;
   });
@@ -365,13 +408,16 @@ export default function AdminDashboard() {
     <div>
       <Header />
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-          
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className=" sm:flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-gray-600">Manage products and payment verifications</p>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Admin Dashboard
+              </h1>
+              <p className="text-gray-600">
+                Manage products and payment verifications
+              </p>
             </div>
             <div className="flex space-x-3">
               <button
@@ -379,9 +425,9 @@ export default function AdminDashboard() {
                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 disabled={loading || paymentLoading}
               >
-                {(loading || paymentLoading) ? 'Loading...' : 'Refresh'}
+                {loading || paymentLoading ? "Loading..." : "Refresh"}
               </button>
-              
+
               {/* 🆕 NEW: Manual cache clear button */}
               <button
                 onClick={handleManualCacheClear}
@@ -390,7 +436,7 @@ export default function AdminDashboard() {
               >
                 🔄 Clear Cache
               </button>
-              
+
               <button
                 onClick={() => router.push("/admin/add-product")}
                 className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
@@ -421,24 +467,26 @@ export default function AdminDashboard() {
             <div className="bg-white p-4 rounded shadow-sm">
               <p className="text-sm text-gray-600">In Stock</p>
               <p className="text-xl font-bold text-green-600">
-                {products.filter(p => p.status === "in stock").length}
+                {products.filter((p) => p.status === "in stock").length}
               </p>
             </div>
             <div className="bg-white p-4 rounded shadow-sm">
               <p className="text-sm text-gray-600">Limited</p>
               <p className="text-xl font-bold text-yellow-600">
-                {products.filter(p => p.status === "limited stock").length}
+                {products.filter((p) => p.status === "limited stock").length}
               </p>
             </div>
             <div className="bg-white p-4 rounded shadow-sm">
               <p className="text-sm text-gray-600">Out of Stock</p>
               <p className="text-xl font-bold text-red-600">
-                {products.filter(p => p.status === "out of stock").length}
+                {products.filter((p) => p.status === "out of stock").length}
               </p>
             </div>
             <div className="bg-white p-4 rounded shadow-sm">
               <p className="text-sm text-gray-600">Pending Payments</p>
-              <p className={`text-xl font-bold ${pendingOrders.length > 0 ? 'text-yellow-600' : 'text-green-600'}`}>
+              <p
+                className={`text-xl font-bold ${pendingOrders.length > 0 ? "text-yellow-600" : "text-green-600"}`}
+              >
                 {pendingOrders.length}
               </p>
             </div>
@@ -448,15 +496,19 @@ export default function AdminDashboard() {
           <div className="bg-white rounded shadow-sm mb-8">
             <div className="px-4 py-3 border-b bg-yellow-50 flex justify-between items-center">
               <div>
-                <h3 className="font-medium">Payment Verification ({pendingOrders.length})</h3>
-                <p className="text-sm text-gray-600">Orders waiting for approval</p>
+                <h3 className="font-medium">
+                  Payment Verification ({pendingOrders.length})
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Orders waiting for approval
+                </p>
               </div>
               <button
                 onClick={loadPendingOrders}
                 className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
                 disabled={paymentLoading}
               >
-                {paymentLoading ? 'Loading...' : 'Refresh'}
+                {paymentLoading ? "Loading..." : "Refresh"}
               </button>
             </div>
 
@@ -473,8 +525,10 @@ export default function AdminDashboard() {
               ) : (
                 <div className="divide-y">
                   {pendingOrders.map((order, index) => (
-                    <div key={order.id} className={`p-4 border-l-4 ${getUrgencyColor(order.referenceSubmittedAt)}`}>
-                      
+                    <div
+                      key={order.id}
+                      className={`p-4 border-l-4 ${getUrgencyColor(order.referenceSubmittedAt)}`}
+                    >
                       {/* Order header */}
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex items-center gap-3">
@@ -482,18 +536,28 @@ export default function AdminDashboard() {
                             #{index + 1}
                           </span>
                           <div>
-                            <div className="font-medium">Order {order.orderId}</div>
-                            <div className="text-sm text-gray-600">{order.customerName}</div>
-                            <div className="text-sm text-gray-500">{formatTimeAgo(order.referenceSubmittedAt)}</div>
+                            <div className="font-medium">
+                              Order {order.orderId}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {order.customerName}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatTimeAgo(order.referenceSubmittedAt)}
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-lg">₦{order.amount.toLocaleString()}</div>
+                          <div className="font-bold text-lg">
+                            ₦{order.amount.toLocaleString()}
+                          </div>
                           <button
                             onClick={() => toggleOrderExpansion(order.orderId)}
                             className="text-gray-400 hover:text-gray-600 text-sm"
                           >
-                            {expandedOrders.has(order.orderId) ? 'Less' : 'More'}
+                            {expandedOrders.has(order.orderId)
+                              ? "Less"
+                              : "More"}
                           </button>
                         </div>
                       </div>
@@ -502,32 +566,53 @@ export default function AdminDashboard() {
                       {expandedOrders.has(order.orderId) && (
                         <div className="mt-3 space-y-3 bg-gray-50 p-3 rounded">
                           <div>
-                            <p className="text-sm"><strong>Email:</strong> {order.customerEmail}</p>
+                            <p className="text-sm">
+                              <strong>Email:</strong> {order.customerEmail}
+                            </p>
                             {order.customerPhone && (
-                              <p className="text-sm"><strong>Phone:</strong> {order.customerPhone}</p>
+                              <p className="text-sm">
+                                <strong>Phone:</strong> {order.customerPhone}
+                              </p>
                             )}
                           </div>
                           <div>
-                            <p className="text-sm"><strong>Bank:</strong> {order.bankDetails?.bankName || 'N/A'}</p>
-                            <p className="text-sm"><strong>Account:</strong> {order.bankDetails?.accountNumber || 'N/A'}</p>
+                            <p className="text-sm">
+                              <strong>Bank:</strong>{" "}
+                              {order.bankDetails?.bankName || "N/A"}
+                            </p>
+                            <p className="text-sm">
+                              <strong>Account:</strong>{" "}
+                              {order.bankDetails?.accountNumber || "N/A"}
+                            </p>
                           </div>
                           <div>
-                            <p className="text-sm"><strong>Transaction Reference:</strong></p>
+                            <p className="text-sm">
+                              <strong>Transaction Reference:</strong>
+                            </p>
                             <div className="bg-white p-2 rounded border font-mono text-xs break-all">
                               {order.transactionReference}
                             </div>
                           </div>
                           {order.items && order.items.length > 0 && (
                             <div>
-                              <p className="text-sm"><strong>Items ({order.items.length}):</strong></p>
+                              <p className="text-sm">
+                                <strong>Items ({order.items.length}):</strong>
+                              </p>
                               <div className="space-y-1">
-                                {order.items.slice(0, 3).map((item: any, idx: number) => (
-                                  <div key={idx} className="text-xs text-gray-600">
-                                    {item.itemName} (Qty: {item.quantity})
-                                  </div>
-                                ))}
+                                {order.items
+                                  .slice(0, 3)
+                                  .map((item: any, idx: number) => (
+                                    <div
+                                      key={idx}
+                                      className="text-xs text-gray-600"
+                                    >
+                                      {item.itemName} (Qty: {item.quantity})
+                                    </div>
+                                  ))}
                                 {order.items.length > 3 && (
-                                  <div className="text-xs text-gray-500">+{order.items.length - 3} more items</div>
+                                  <div className="text-xs text-gray-500">
+                                    +{order.items.length - 3} more items
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -538,29 +623,41 @@ export default function AdminDashboard() {
                       {/* Action buttons */}
                       <div className="flex gap-2 mt-3">
                         <button
-                          onClick={() => handleVerifyPayment(order.orderId, 'approve')}
+                          onClick={() =>
+                            handleVerifyPayment(order.orderId, "approve")
+                          }
                           disabled={processingOrderId === order.orderId}
                           className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 disabled:opacity-50"
                         >
-                          {processingOrderId === order.orderId ? 'Processing...' : 'Approve'}
+                          {processingOrderId === order.orderId
+                            ? "Processing..."
+                            : "Approve"}
                         </button>
                         <button
-                          onClick={() => handleVerifyPayment(order.orderId, 'reject')}
+                          onClick={() =>
+                            handleVerifyPayment(order.orderId, "reject")
+                          }
                           disabled={processingOrderId === order.orderId}
                           className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 disabled:opacity-50"
                         >
                           Reject
                         </button>
                         <button
-                          onClick={() => window.open(`mailto:${order.customerEmail}?subject=Order ${order.orderId}`)}
+                          onClick={() =>
+                            window.open(
+                              `mailto:${order.customerEmail}?subject=Order ${order.orderId}`
+                            )
+                          }
                           className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
                         >
                           Email
                         </button>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(order.transactionReference);
-                            alert('Copied!');
+                            navigator.clipboard.writeText(
+                              order.transactionReference
+                            );
+                            alert("Copied!");
                           }}
                           className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600"
                         >
@@ -591,7 +688,9 @@ export default function AdminDashboard() {
               >
                 <option value="">All Categories</option>
                 {categories.map((category) => (
-                  <option key={category} value={category}>{category}</option>
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
                 ))}
               </select>
               <select
@@ -620,7 +719,9 @@ export default function AdminDashboard() {
           {/* Products Table */}
           <div className="bg-white rounded shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b">
-              <h3 className="font-medium">Products ({filteredProducts.length})</h3>
+              <h3 className="font-medium">
+                Products ({filteredProducts.length})
+              </h3>
             </div>
 
             {loading ? (
@@ -633,18 +734,33 @@ export default function AdminDashboard() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Product
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Category
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Price
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Status
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredProducts.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                          {products.length === 0 ? "No products yet." : "No matches."}
+                        <td
+                          colSpan={5}
+                          className="px-4 py-8 text-center text-gray-500"
+                        >
+                          {products.length === 0
+                            ? "No products yet."
+                            : "No matches."}
                         </td>
                       </tr>
                     ) : (
@@ -652,21 +768,37 @@ export default function AdminDashboard() {
                         <tr key={product.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <div className="flex items-center">
-                              <img className="h-10 w-10 rounded object-cover mr-3" src={product.imageURL} alt={product.itemName} />
+                              <img
+                                className="h-10 w-10 rounded object-cover mr-3"
+                                src={product.imageURL}
+                                alt={product.itemName}
+                              />
                               <div>
-                                <div className="text-sm font-medium text-gray-900 truncate max-w-xs">{product.itemName}</div>
-                                <div className="text-sm text-gray-500">{product.brand}</div>
+                                <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
+                                  {product.itemName}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {product.brand}
+                                </div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{product.category}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">₦{product.amount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {product.category}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                            ₦{product.amount.toLocaleString()}
+                          </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              product.status === "in stock" ? "bg-green-100 text-green-800" :
-                              product.status === "limited stock" ? "bg-yellow-100 text-yellow-800" :
-                              "bg-red-100 text-red-800"
-                            }`}>
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full ${
+                                product.status === "in stock"
+                                  ? "bg-green-100 text-green-800"
+                                  : product.status === "limited stock"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                              }`}
+                            >
                               {product.status}
                             </span>
                           </td>
@@ -679,7 +811,12 @@ export default function AdminDashboard() {
                                 Edit
                               </button>
                               <button
-                                onClick={() => handleDeleteProduct(product.id, product.itemName)}
+                                onClick={() =>
+                                  handleDeleteProduct(
+                                    product.id,
+                                    product.itemName
+                                  )
+                                }
                                 className="text-red-600 hover:text-red-900 px-2 py-1 text-sm"
                               >
                                 Delete

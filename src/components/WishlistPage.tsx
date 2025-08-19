@@ -204,7 +204,7 @@ export default function WishlistPage() {
     <div>
       <Header />
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-[1400px] mx-auto px-4">
+        <div className="max-w-[1200px] mx-auto px-4">
           {/* 🔄 Sync Status Indicator */}
           {syncStatus === "syncing" && (
             <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-md mb-4 text-sm">

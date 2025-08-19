@@ -687,7 +687,7 @@ const allBrands = [
     <div>
       <Header />
       <div className="min-h-screen bg-gray-50">
-        <div className="w-full max-w-[1400px] mx-auto px-2 sm:px-4 py-6">
+        <div className="w-full max-w-[1200px] mx-auto px-2 sm:px-4 py-6">
           {/* Mobile Filter Backdrop */}
           {showMobileFilters && (
             <div

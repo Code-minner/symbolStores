@@ -46,7 +46,7 @@ function OrderReceiptContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="w-full max-w-[1400px] mx-auto px-4 py-8">
+      <div className="w-full max-w-[1200px] mx-auto px-4 py-8">
         {/* Breadcrumbs */}
         <div className="w-[95%] overflow-x-auto py-3 pr-4 mr-4">
           <nav className="flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">

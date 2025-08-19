@@ -62,6 +62,7 @@ export default function AdminAddProductPage() {
   });
 
   const [images, setImages] = useState<File[]>([]);
+  const [mainImageIndex, setMainImageIndex] = useState(0); // NEW: Track which image is main
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentUpload, setCurrentUpload] = useState("");
@@ -377,6 +378,7 @@ const brands = [
       }
 
       setImages(compressedFiles);
+      setMainImageIndex(0); // Reset main image to first image
       setCurrentUpload("");
     } catch (error) {
       console.error("Error processing images:", error);
@@ -477,6 +479,15 @@ const brands = [
       setUploadProgress(90);
       setCurrentUpload("Saving product details to database...");
 
+      // UPDATED: Reorder images so main image is first
+      const reorderedImageURLs = [...imageURLs];
+      if (mainImageIndex !== 0 && imageURLs.length > mainImageIndex) {
+        // Move the main image to the front
+        const mainImageUrl = reorderedImageURLs[mainImageIndex];
+        reorderedImageURLs.splice(mainImageIndex, 1);
+        reorderedImageURLs.unshift(mainImageUrl);
+      }
+
       const featuresArray = formData.features
         .split("\n")
         .filter((feature) => feature.trim() !== "")
@@ -503,8 +514,8 @@ const brands = [
         sku: formData.sku,
         warranty: formData.warranty.trim() || null,
         slug,
-        imageURL: imageURLs[0],
-        images: imageURLs,
+        imageURL: reorderedImageURLs[0], // Main image is now first
+        images: reorderedImageURLs,
         inStock: formData.status === "in stock",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -545,6 +556,7 @@ const brands = [
         imageURL: "",
       });
       setImages([]);
+      setMainImageIndex(0); // Reset main image index
       setUploadProgress(0);
       setCurrentUpload("");
 
@@ -563,7 +575,26 @@ const brands = [
   };
 
   const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
+    const newImages = images.filter((_, i) => i !== index);
+    setImages(newImages);
+    
+    // Adjust main image index if needed
+    if (index === mainImageIndex) {
+      // If we're removing the main image, set main to first image
+      setMainImageIndex(0);
+    } else if (index < mainImageIndex) {
+      // If we're removing an image before the main image, adjust the index
+      setMainImageIndex(mainImageIndex - 1);
+    }
+    // If mainImageIndex is >= newImages.length, reset to 0
+    if (mainImageIndex >= newImages.length && newImages.length > 0) {
+      setMainImageIndex(0);
+    }
+  };
+
+  // NEW: Function to set main image
+  const setMainImage = (index: number) => {
+    setMainImageIndex(index);
   };
 
   // Show loading spinner while checking auth
@@ -579,7 +610,8 @@ const brands = [
     <div>
       <Header />
       <div className="py-16 px-4 bg-gray-50 min-h-screen">
-        <div className="w-full max-w-[1400px] mx-auto">
+        {/* UPDATED: Reduced max-width from 1400px to 1100px */}
+        <div className="w-full max-w-[1100px] mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <button
@@ -636,8 +668,8 @@ const brands = [
                     Click to upload product images
                   </p>
                   <p className="text-sm text-gray-500">
-                    Maximum 3 images • Each under 5MB • Images will be
-                    compressed automatically
+                    Maximum 3 images • Each under 5MB • **Recommended: 1000x1000px (square)**<br/>
+                    Images will be automatically compressed to 800px max
                   </p>
                 </label>
               </div>
@@ -662,36 +694,49 @@ const brands = [
                 </div>
               )}
 
-              {/* Image Previews */}
+              {/* UPDATED: Image Previews with Main Image Selection */}
               {images.length > 0 && (
                 <div className="mt-6">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">
                     Selected Images ({images.length}/3)
                   </h4>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Click on any image to set it as the main product image
+                  </p>
                   <div className="grid grid-cols-3 gap-4">
                     {images.map((img, idx) => (
                       <div
                         key={idx}
-                        className="relative border rounded-lg overflow-hidden group"
+                        className={`relative border-2 rounded-lg overflow-hidden group cursor-pointer transition-all ${
+                          idx === mainImageIndex 
+                            ? 'border-blue-500 ring-2 ring-blue-200' 
+                            : 'border-gray-300 hover:border-blue-400'
+                        }`}
+                        onClick={() => setMainImage(idx)}
                       >
                         <img
                           src={URL.createObjectURL(img)}
                           alt={`Preview ${idx + 1}`}
                           className="object-cover w-full h-32"
                         />
-                        {idx === 0 && (
-                          <span className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                        {idx === mainImageIndex && (
+                          <span className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded font-medium">
                             Main
                           </span>
                         )}
                         <button
-                          onClick={() => removeImage(idx)}
-                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent triggering setMainImage
+                            removeImage(idx);
+                          }}
+                          className="absolute top-2 right-2 z-10  bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                           type="button"
                           disabled={loading}
                         >
                           ×
                         </button>
+                        {/* Add a click indicator */}
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all"></div>
                       </div>
                     ))}
                   </div>

@@ -9,13 +9,13 @@ import Footer from "@/components/Footer";
 import { useCart } from "@/lib/CartContext";
 
 export default function CartPage() {
-  const { 
-    state, 
-    removeFromCart, 
-    updateQuantity, 
-    clearCart, 
+  const {
+    state,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
     formatPrice,
-    getShippingMessage 
+    getShippingMessage,
   } = useCart();
 
   const handleQuantityChange = (
@@ -48,7 +48,7 @@ export default function CartPage() {
     <div>
       <Header />
       <div className="min-h-screen bg-gray-50">
-        <div className="w-full max-w-[1400px] mx-auto px-4 py-8">
+        <div className="w-full max-w-[1200px] mx-auto px-4 py-8">
           {/* Breadcrumbs */}
           <div className="w-[95%] overflow-x-auto py-3 pr-4 mr-4">
             <nav className="flex items-center text-sm text-gray-600 whitespace-nowrap space-x-2">
@@ -341,8 +341,12 @@ export default function CartPage() {
 
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Shipping</span>
-                        <span className={`font-medium ${state.isFreeShipping ? "text-green-600" : ""}`}>
-                          {state.isFreeShipping ? "Free" : formatPrice(state.shippingCost)}
+                        <span
+                          className={`font-medium ${state.isFreeShipping ? "text-green-600" : ""}`}
+                        >
+                          {state.isFreeShipping
+                            ? "Free"
+                            : formatPrice(state.shippingCost)}
                         </span>
                       </div>
 

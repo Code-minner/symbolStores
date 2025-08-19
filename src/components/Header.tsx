@@ -92,121 +92,106 @@ export default function Header() {
     "Washing Machine",
   ];
 
-const categorySubItems: { [key: string]: string[] } = {
-  "All Categories": [],
+  const categorySubItems: { [key: string]: string[] } = {
+    "All Categories": [],
 
-  "Generator": [
-    "Sound Proof Generator Set",
-    "Manual Starter",
-    "Electric And Manual Starter"
-  ],
+    Generator: [
+      "Sound Proof Generator Set",
+      "Manual Starter",
+      "Electric And Manual Starter",
+    ],
 
-  "Audio Bass": [
-    "Mini Hi-Fi System",
-    "Wireless Speakers",
-    "Sound Bars",
-    "Dvd Player",
-    "Av Receiver Systems",
-    "Home Theatre Systems",
-    "Rechargeable Speaker System"
-  ],
+    "Audio Bass": [
+      "Mini Hi-Fi System",
+      "Wireless Speakers",
+      "Sound Bars",
+      "Dvd Player",
+      "Av Receiver Systems",
+      "Home Theatre Systems",
+      "Rechargeable Speaker System",
+    ],
 
-  "Stove": [
-    "Table Top Gas Cooker",
-    "50x50 Cookers",
-    "60x60 Cookers",
-    "60x90 Cookers",
-    "90x60 Cookers",
-    "Air Fryer"
-  ],
+    Stove: [
+      "Table Top Gas Cooker",
+      "50x50 Cookers",
+      "60x60 Cookers",
+      "60x90 Cookers",
+      "90x60 Cookers",
+      "Air Fryer",
+    ],
 
-  "Washing Machine": [
-    "Front Load Washing Machine",
-    "Top Load Washing Machine",
-    "Automatic Washing Machine",
-    "Wash And Dry",
-    "Commercial Dryer",
-    "Twin Tub Washing Machines",
-    "Tumble Dryer"
-  ],
+    "Washing Machine": [
+      "Front Load Washing Machine",
+      "Top Load Washing Machine",
+      "Automatic Washing Machine",
+      "Wash And Dry",
+      "Commercial Dryer",
+      "Twin Tub Washing Machines",
+      "Tumble Dryer",
+    ],
 
-  "Air Conditioner": [
-    "Portable Air Conditioner",
-    "Inverter Air Conditioner",
-    "Floor Standing Air Conditioner",
-    "Split Air Conditioner"
-  ],
+    "Air Conditioner": [
+      "Portable Air Conditioner",
+      "Inverter Air Conditioner",
+      "Floor Standing Air Conditioner",
+      "Split Air Conditioner",
+    ],
 
-  "Freezers": [
-    "Standing Freezer",
-    "Chest Freezer",
-    "Deep Freezer"
-  ],
+    Freezers: ["Standing Freezer", "Chest Freezer", "Deep Freezer"],
 
-  "Refrigerators": [
-    "Instaview Door In Door Refrigerator",
-    "Door In Door Refrigerator",
-    "Side By Side Refrigerator",
-    "Bottom Freezer Refrigerator",
-    "Top Freezer Refrigerator",
-    "Single Door Refrigerator",
-    "Double Door Refrigerator"
-  ],
+    Refrigerators: [
+      "Instaview Door In Door Refrigerator",
+      "Door In Door Refrigerator",
+      "Side By Side Refrigerator",
+      "Bottom Freezer Refrigerator",
+      "Top Freezer Refrigerator",
+      "Single Door Refrigerator",
+      "Double Door Refrigerator",
+    ],
 
-  "TVs": [
-    "Signature Tv",
-    "Laser Tv",
-    "Qned Tv",
-    "Oled Tv",
-    "Nanocell Tv",
-    "Qled Tv",
-    "Uled Tv",
-    "Uhd Tv",
-    "Smart Tv",
-    "Led Tv",
-    "Fhd"
-  ],
+    TVs: [
+      "Signature Tv",
+      "Laser Tv",
+      "Qned Tv",
+      "Oled Tv",
+      "Nanocell Tv",
+      "Qled Tv",
+      "Uled Tv",
+      "Uhd Tv",
+      "Smart Tv",
+      "Led Tv",
+      "Fhd",
+    ],
 
-  "Fan's": [
-    "Rechargeable Fan",
-    "Ceiling Fan",
-    "Standing Fan",
-    "Wall Fan"
-  ],
+    "Fan's": ["Rechargeable Fan", "Ceiling Fan", "Standing Fan", "Wall Fan"],
 
-  "Home & Kitchen": [
-    "Toaster",
-    "Air Fryer",
-    "Electric Kettle",
-    "Griller",
-    "Hotplate",
-    "Hand Mixer",
-    "Vacuum Cleaner",
-    "Slow Juicer",
-    "Jug Kettle",
-    "Coffee Maker",
-    "Sandwichmaker",
-    "Mixer Grinder"
-  ],
+    "Home & Kitchen": [
+      "Toaster",
+      "Air Fryer",
+      "Electric Kettle",
+      "Griller",
+      "Hotplate",
+      "Hand Mixer",
+      "Vacuum Cleaner",
+      "Slow Juicer",
+      "Jug Kettle",
+      "Coffee Maker",
+      "Sandwichmaker",
+      "Mixer Grinder",
+    ],
 
-  "Pressing Iron": [
-    "Dry Iron",
-    "Steam Iron"
-  ],
+    "Pressing Iron": ["Dry Iron", "Steam Iron"],
 
-  "Extensions": [
-    "Ac Guard"
-  ],
+    Extensions: ["Ac Guard"],
 
-  "Microwave": [],
-  "Water Dispenser": [],
-  "Blender": [],
-  "Yam Pounder": [],
-  "Dish Washer": [],
-  "Stabilizer": [],
-  "Furniture": [],
-};
-
+    Microwave: [],
+    "Water Dispenser": [],
+    Blender: [],
+    "Yam Pounder": [],
+    "Dish Washer": [],
+    Stabilizer: [],
+    Furniture: [],
+  };
 
   const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -421,7 +406,8 @@ const categorySubItems: { [key: string]: string[] } = {
       )}
 
       {/* Top Header */}
-      <div className="w-full px-4 py-4 lg:mx-auto" 
+      <div
+        className="w-full px-4 py-2 lg:mx-auto"
         style={{ backgroundColor: "var(--header_background)" }}
       >
         <div className="flex items-center max-w-[1400px] relative m-auto justify-between gap-4 py-2">
@@ -464,7 +450,7 @@ const categorySubItems: { [key: string]: string[] } = {
               <input
                 type="text"
                 placeholder="Search For Products"
-                className="flex-1 px-3 py-4 text-lg text-black placeholder-[#626262] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-inset"
+                className="flex-1 px-3 py-1 text-lg text-black placeholder-[#626262] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-inset"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onFocus={() => {
@@ -620,7 +606,7 @@ const categorySubItems: { [key: string]: string[] } = {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden sm:flex items-center py-3 text-lg relative font-bold gap-4 text-gray-700 justify-between overflow-x-auto">
+          <nav className="hidden sm:flex items-center py-1 text-lg relative font-bold gap-2 text-gray-700 justify-between overflow-x-auto">
             {/* All Categories Button */}
             <button
               ref={categoryButtonRef}
@@ -629,7 +615,7 @@ const categorySubItems: { [key: string]: string[] } = {
               aria-label="Toggle menu"
             >
               <div
-                className="whitespace-nowrap font-medium cursor-pointer px-6 py-2 rounded-full hover:text-white transition-all duration-300"
+                className="whitespace-nowrap font-medium text-[12px] cursor-pointer px-6 py-1 rounded-full hover:text-white transition-all duration-300"
                 style={{ backgroundColor: "var(--header_background)" }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor =
@@ -646,7 +632,7 @@ const categorySubItems: { [key: string]: string[] } = {
             {categories.map((category, index) => (
               <div
                 key={index}
-                className="whitespace-nowrap font-medium cursor-pointer px-6 py-2 rounded-full hover:text-white transition-all duration-300"
+                className="whitespace-nowrap font-medium text-[10px]  cursor-pointer px-6 py-1 rounded-full hover:text-white transition-all duration-300"
                 onClick={() => handleCategoryClick(category)}
                 style={{ backgroundColor: "var(--header_background)" }}
                 onMouseEnter={(e) =>

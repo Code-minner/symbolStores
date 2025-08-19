@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { clearAllProductCaches } from '@/lib/cacheUtils';
+import { clearAllProductCaches } from "@/lib/cacheUtils";
 
 type FormDataType = {
   itemName: string;
@@ -52,186 +52,172 @@ export default function EditProductPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentUpload, setCurrentUpload] = useState("");
 
-// Categories and subcategories (updated from database)
-const categories = [
-  "Generator",
-  "Audio Bass", 
-  "Microwave",
-  "Stove",
-  "Washing Machine",
-  "Air conditioner",
-  "Freezers",
-  "Refrigerators",
-  "TVs",
-  "Gotv",
-  "WATER DISPENSER",
-  "BLENDER",
-  "YAM PONDER",
-  "DISH WASHER",
-  "stabilizer",
-  "Fornitures",
-  "Fan's",
-  "Home & Kitchen",
-  "Pressing Iron",
-  "Extensions"
-];
+  // Categories and subcategories (updated from database)
+  const categories = [
+    "Generator",
+    "Audio Bass",
+    "Microwave",
+    "Stove",
+    "Washing Machine",
+    "Air conditioner",
+    "Freezers",
+    "Refrigerators",
+    "TVs",
+    "Gotv",
+    "WATER DISPENSER",
+    "BLENDER",
+    "YAM PONDER",
+    "DISH WASHER",
+    "stabilizer",
+    "Fornitures",
+    "Fan's",
+    "Home & Kitchen",
+    "Pressing Iron",
+    "Extensions",
+  ];
 
-const categorySubItems: { [key: string]: string[] }={
-  "Generator": [
-    "Sound proof generator set",
-    "Manual starter",
-    "Electric and manual starter"
-  ],
-  "Audio Bass": [
-    "Mini Hi-Fi System",
-    "Wireless Speakers",
-    "Sound Bars",
-    "DVD Player",
-    "AV Receiver Systems",
-    "Home Theatre Systems",
-    "Rechargeable Speaker System"
-  ],
-  "Microwave": [],
-  "Stove": [
-    "Table Top Gas Cooker",
-    "50x50 Cookers",
-    "60x60 cookers",
-    "60x90 Cookers",
-    "90x60 Cookers",
-    "Air Fryer"
-  ],
-  "Washing Machine": [
-    "Front Load Washing Machine",
-    "Top Load Washing Machine", 
-    "Automatic Washing Machine",
-    "Wash and Dry",
-    "Commercial Dryer",
-    "Twin Tub Washing Machines",
-    "Tumble Dryer"
-  ],
-  "Air conditioner": [
-    "Portable Air Conditioner",
-    "Inverter Air Conditioner",
-    "Floor Standing Air Conditioner",
-    "Split Air Conditioner"
-  ],
-  "Freezers": [
-    "Standing Freezer",
-    "Chest Freezer",
-    "Deep Freezer"
-  ],
-  "Refrigerators": [
-    "InstaView Door In Door Refrigerator",
-    "Door In Door Refrigerator",
-    "Side By Side Refrigerator",
-    "Bottom Freezer Refrigerator",
-    "Top Freezer Refrigerator",
-    "Single Door Refrigerator",
-    "Double Door Refrigerator"
-  ],
-  "TVs": [
-    "Signature TV",
-    "Laser TV", 
-    "QNED TV",
-    "OLED TV",
-    "NanoCell TV",
-    "QLED TV",
-    "ULED TV",
-    "UHD TV",
-    "Smart TV",
-    "LED TV",
-    "FHD"
-  ],
-  "Gotv": [],
-  "WATER DISPENSER": [],
-  "BLENDER": [],
-  "YAM PONDER": [],
-  "DISH WASHER": [],
-  "stabilizer": [],
-  "Fornitures": [],
-  "Fan's": [
-    "Rechargeable Fan",
-    "Ceiling Fan", 
-    "Standing Fan",
-    "Wall Fan"
-  ],
-  "Home & Kitchen": [
-    "Toaster",
-    "Air Fryer",
-    "Electric Kettle", 
-    "Griller",
-    "Hotplate",
-    "Hand Mixer",
-    "Vacuum Cleaner",
-    "Slow Juicer",
-    "Jug Kettle",
-    "COFFEE MAKER",
-    "SandwichMaker",
-    "MIXER GRINDER"
-  ],
-  "Pressing Iron": [
-    "Dry Iron",
-    "Steam Iron"
-  ],
-  "Extensions": [
-    "Ac guard"
-  ]
-};
+  const categorySubItems: { [key: string]: string[] } = {
+    Generator: [
+      "Sound proof generator set",
+      "Manual starter",
+      "Electric and manual starter",
+    ],
+    "Audio Bass": [
+      "Mini Hi-Fi System",
+      "Wireless Speakers",
+      "Sound Bars",
+      "DVD Player",
+      "AV Receiver Systems",
+      "Home Theatre Systems",
+      "Rechargeable Speaker System",
+    ],
+    Microwave: [],
+    Stove: [
+      "Table Top Gas Cooker",
+      "50x50 Cookers",
+      "60x60 cookers",
+      "60x90 Cookers",
+      "90x60 Cookers",
+      "Air Fryer",
+    ],
+    "Washing Machine": [
+      "Front Load Washing Machine",
+      "Top Load Washing Machine",
+      "Automatic Washing Machine",
+      "Wash and Dry",
+      "Commercial Dryer",
+      "Twin Tub Washing Machines",
+      "Tumble Dryer",
+    ],
+    "Air conditioner": [
+      "Portable Air Conditioner",
+      "Inverter Air Conditioner",
+      "Floor Standing Air Conditioner",
+      "Split Air Conditioner",
+    ],
+    Freezers: ["Standing Freezer", "Chest Freezer", "Deep Freezer"],
+    Refrigerators: [
+      "InstaView Door In Door Refrigerator",
+      "Door In Door Refrigerator",
+      "Side By Side Refrigerator",
+      "Bottom Freezer Refrigerator",
+      "Top Freezer Refrigerator",
+      "Single Door Refrigerator",
+      "Double Door Refrigerator",
+    ],
+    TVs: [
+      "Signature TV",
+      "Laser TV",
+      "QNED TV",
+      "OLED TV",
+      "NanoCell TV",
+      "QLED TV",
+      "ULED TV",
+      "UHD TV",
+      "Smart TV",
+      "LED TV",
+      "FHD",
+    ],
+    Gotv: [],
+    "WATER DISPENSER": [],
+    BLENDER: [],
+    "YAM PONDER": [],
+    "DISH WASHER": [],
+    stabilizer: [],
+    Fornitures: [],
+    "Fan's": ["Rechargeable Fan", "Ceiling Fan", "Standing Fan", "Wall Fan"],
+    "Home & Kitchen": [
+      "Toaster",
+      "Air Fryer",
+      "Electric Kettle",
+      "Griller",
+      "Hotplate",
+      "Hand Mixer",
+      "Vacuum Cleaner",
+      "Slow Juicer",
+      "Jug Kettle",
+      "COFFEE MAKER",
+      "SandwichMaker",
+      "MIXER GRINDER",
+    ],
+    "Pressing Iron": ["Dry Iron", "Steam Iron"],
+    Extensions: ["Ac guard"],
+  };
 
-const brands = [
-  "Haier Thermocool",
-  "Hisense",
-  "Bruhm",
-  "LG",
-  "DAIKIN",
-  "KENWOOD",
-  "Binatone",
-  "Panasonic",
-  "Scanfrost",
-  "GOtv",
-  "Sony",
-  "SUMEC",
-  "GREE",
-  "Midea",
-  "MAXI",
-  "Samsung",
-  "Huawei",
-  "Aeon",
-  "Toshiba",
-  "KENSTAR",
-  "TCL",
-  "Royal",
-  "Rite-Tek",
-  "SYINIX",
-  "INFINIX",
-  "DELTA",
-  "TRANE",
-  "Beko",
-  "F&D",
-  "HOME FLOWER",
-  "Havells",
-  "OX",
-  "Century",
-  "Nexus",
-  "Nature Power",
-  "Navkar",
-  "D-MARC",
-  "Sonik",
-  "Enkor",
-  "Saisho",
-  "Firman",
-  "Power Deluxe",
-  "Itel Safer",
-  "VBT-AX",
-  "APC",
-  "ZVT",
-  "Sollatek",
-  "TBK BIANCO",
-  "Tigmax",
-  "ELEPAQ",
-  "KEMAGE",
-  "Others",
-];
+  const brands = [
+    "Haier Thermocool",
+    "Hisense",
+    "Bruhm",
+    "LG",
+    "DAIKIN",
+    "KENWOOD",
+    "Binatone",
+    "Panasonic",
+    "Scanfrost",
+    "GOtv",
+    "Sony",
+    "SUMEC",
+    "GREE",
+    "Midea",
+    "MAXI",
+    "Samsung",
+    "Huawei",
+    "Aeon",
+    "Toshiba",
+    "KENSTAR",
+    "TCL",
+    "Royal",
+    "Rite-Tek",
+    "SYINIX",
+    "INFINIX",
+    "DELTA",
+    "TRANE",
+    "Beko",
+    "F&D",
+    "HOME FLOWER",
+    "Havells",
+    "OX",
+    "Century",
+    "Nexus",
+    "Nature Power",
+    "Navkar",
+    "D-MARC",
+    "Sonik",
+    "Enkor",
+    "Saisho",
+    "Firman",
+    "Power Deluxe",
+    "Itel Safer",
+    "VBT-AX",
+    "APC",
+    "ZVT",
+    "Sollatek",
+    "TBK BIANCO",
+    "Tigmax",
+    "ELEPAQ",
+    "KEMAGE",
+    "Others",
+  ];
 
   // Check admin access and load product
   useEffect(() => {
@@ -540,22 +526,22 @@ const brands = [
       };
 
       await updateDoc(doc(db, "products", productId), updateData);
-setUploadProgress(90);
-setCurrentUpload("Product updated successfully!");
+      setUploadProgress(90);
+      setCurrentUpload("Product updated successfully!");
 
-// ✅ ADD THIS: Clear cache so changes show immediately
-try {
-  setCurrentUpload("Clearing cache...");
-  await clearAllProductCaches();
-  setUploadProgress(100);
-  setCurrentUpload("Cache cleared!");
-} catch (cacheError) {
-  console.warn('Cache clearing failed:', cacheError);
-  // Don't fail the whole operation if cache clearing fails
-}
+      // ✅ ADD THIS: Clear cache so changes show immediately
+      try {
+        setCurrentUpload("Clearing cache...");
+        await clearAllProductCaches();
+        setUploadProgress(100);
+        setCurrentUpload("Cache cleared!");
+      } catch (cacheError) {
+        console.warn("Cache clearing failed:", cacheError);
+        // Don't fail the whole operation if cache clearing fails
+      }
 
-alert("✅ Product updated and cache cleared!");
-router.push("/admin/dashboard");
+      alert("✅ Product updated and cache cleared!");
+      router.push("/admin/dashboard");
     } catch (err: any) {
       console.error("Error updating product:", err);
       alert(
@@ -581,7 +567,7 @@ router.push("/admin/dashboard");
     <div>
       <Header />
       <div className="py-16 px-4 bg-gray-50 min-h-screen">
-        <div className="w-full max-w-[1400px] mx-auto">
+        <div className="w-full max-w-[1200px] mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <button

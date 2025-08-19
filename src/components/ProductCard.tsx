@@ -160,7 +160,7 @@ export default function ProductCard({
     >
       {/* Image Container - Fixed Height */}
       <div
-        className="h-[160px] sm:h-[210px]  "
+        className="h-[140px] sm:h-[150px]"
         style={{
           position: "relative",
           marginBottom: "10px",

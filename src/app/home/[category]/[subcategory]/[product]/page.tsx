@@ -411,7 +411,7 @@ export default function ProductDetails({ params }: ProductDetailsProps) {
         </div>
       )}
 
-      <div className="w-full max-w-[1400px] mx-auto">
+      <div className="w-full max-w-[1200px] mx-auto">
         <div className="min-h-[100%] pb-4 pt-4">
           {/* Breadcrumb with Home Icon */}
           <div className="w-[95%] overflow-x-auto py-3 px-4 mr-4">
